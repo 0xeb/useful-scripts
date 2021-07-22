@@ -37,6 +37,7 @@ def apply_diff(diff_file, bin_file, verify):
     # Read the diff file
     count = 0
     line_no = 0
+    nwarning = 0
     try:
         for line in df:
             line_no += 1
@@ -55,13 +56,15 @@ def apply_diff(diff_file, bin_file, verify):
 
                 if v != o:
                     print("WARNING: verification failed. Original byte %02X is expected, %02X found instead. Skipping." % (o, v))
+                    nwarning += 1
+
 
             bf.seek(seek_pos)
             v = int(m.group(3), 16)
             bf.write(bytes([v]))
             count += 1
 
-        ok, msg = True, ("Applied %d patche(s)" % count)
+        ok, msg = True, (f"Applied {count} patche(s), with {nwarning} warning(s).")
 
     except Exception as e:
         ok, msg = False, "At line %d, seek %08X, exception occured during patching: %s" % (line_no, seek_pos, str(e))
