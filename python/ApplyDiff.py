@@ -1,16 +1,18 @@
-import os, sys, re, getopt
-#import code
 """
 Apply a DIFF file to a binary file.
 
 
 A DIFF file can be generated from IDA Pro for example or the output of "FC.EXE /B file1.bin file2.bin
 """
+import os, sys, re, getopt
 
 # TODO:
 # -- make as an IDA plugin
 # -- add "Apply DIF" menu
 # -- refactor
+
+#import code
+
 def apply_diff(diff_file, bin_file, verify):
     # Get the binary file size
     try:
@@ -36,11 +38,9 @@ def apply_diff(diff_file, bin_file, verify):
 
     # Read the diff file
     count = 0
-    line_no = 0
     nwarning = 0
     try:
-        for line in df:
-            line_no += 1
+        for (lino_no, line) in enumerate(df, start=1):
             m = diff_re.match(line.strip())
             if not m:
                 continue
@@ -70,13 +70,12 @@ def apply_diff(diff_file, bin_file, verify):
         ok, msg = False, "At line %d, seek %08X, exception occured during patching: %s" % (line_no, seek_pos, str(e))
         #code.interact(local=locals())
 
-
     bf.close()
     df.close()
 
     return (ok, msg)
 
-
+# --------------------------------------------------------------------------------------------
 def show_help(err_msg = None):
     if err_msg is not None:
         print("Error parsing arguments: %s " % err_msg)
@@ -84,6 +83,7 @@ def show_help(err_msg = None):
     print('%s -i <diff inputfile> -o <bin outputfile> [-f (force)]' % os.path.basename(sys.argv[0]))
 
 
+# --------------------------------------------------------------------------------------------
 def main(argv):
     verify = True
     bin_file = diff_file = None
