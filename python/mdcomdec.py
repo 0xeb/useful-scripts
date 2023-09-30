@@ -49,8 +49,7 @@ def recompose_markdown(input_folder, output_file):
                 md_file.write(f'# {title}\n')
                 md_file.write(file_content.read())
 
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description='Unified tool for parsing and recomposing markdown files.')
     parser.add_argument('action', choices=['c', 'd'], help='c for compose, d for decompose')
     parser.add_argument('-i', '--input', required=True, help='The input file (for decompose) or folder (for compose).')
@@ -62,3 +61,6 @@ if __name__ == "__main__":
         decompose_markdown(args.input, args.output)
     elif args.action == 'c':
         recompose_markdown(args.input, args.output)
+
+if __name__ == "__main__":
+    main()
