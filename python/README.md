@@ -50,3 +50,7 @@ It works in two modes: decompose and compose.
 
 In decompose mode, it takes a single Markdown file and breaks it into multiple files
 In compose mode, it takes a folder with multiple Markdown files and combines them into a single file
+
+## markdown_render.py
+
+This is a simple script that renders a Markdown file into HTML on localhost.
