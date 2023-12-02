@@ -4,6 +4,9 @@ setup(
     name='useful_scripts',
     version='0.1.0',
     packages=find_packages(),
+   install_requires=[
+        'markdown2',
+    ],
     entry_points={
         'console_scripts': [
             'ApplyDiff = ApplyDiff:main',
