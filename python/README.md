@@ -54,3 +54,7 @@ In compose mode, it takes a folder with multiple Markdown files and combines the
 ## markdown_render.py
 
 This is a simple script that renders a Markdown file into HTML on localhost.
+
+## jsontree.py
+
+This script takes a JSON file and prints its structure in a tree format (the values are not displayed).

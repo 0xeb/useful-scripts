@@ -11,6 +11,7 @@ setup(
             'html_entities = html_entities:main',
             'mdcomdec = mdcomdec:main',
             'parse_vcf = parse_vcf:main',
+            'jsontree = jsontree:main',            
             'markdown_render = markdown_render:main',
             #'preprocess = preprocess:main',
         ],
