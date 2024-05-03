@@ -44,7 +44,18 @@ def read_expressions(expr_file_path: str):
     expressions = []
     titles = []
     current_expression = []
+    current_vars = {}
     capture = False  # Flag to determine whether to capture lines as part of an expression
+
+    def flush_expression():
+        nonlocal current_expression, current_vars
+        expr_str = '\n'.join(current_expression)        
+        # Replace all variables in the expression with their values
+        for var_name, value in current_vars.items():
+            expr_str = expr_str.replace(f'${var_name}', value)
+        current_expression = []
+        current_vars = {}
+        return expr_str
 
     with open(expr_file_path, 'r') as file:
         for line in file:
@@ -53,22 +64,27 @@ def read_expressions(expr_file_path: str):
                 continue
             if line.startswith(';') or line.startswith('//'):
                 continue
-
+            # New expression
             if line.startswith('#'):  # Any line that starts with '#' might be a header
                 if current_expression and capture:
                     # Join all parts of the current expression into a single string and add it to the list
-                    expressions.append('\n'.join(current_expression))
-                    current_expression = []  # Reset for the next expression
+                    expressions.append(flush_expression())
 
                 # Check if this header line should trigger capturing the next lines as part of an expression
                 if capture := line.startswith('# *'):
                     titles.append(line[3:].strip())
+            # Variables
+            elif line.startswith('$'):
+                # parse lines as such: $var_name=value
+                var_name, value = line[1:].split('=')
+                current_vars[var_name.strip()] = value.strip()
+            # Capturing
             elif capture:
                 current_expression.append(oline.rstrip())
 
     # Add the last expression if the file ended but there was an expression being captured
     if current_expression and capture:
-        expressions.append('\n'.join(current_expression))
+        expressions.append(flush_expression())
 
     return (expressions, titles)
 
