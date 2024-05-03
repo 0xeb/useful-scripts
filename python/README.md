@@ -58,3 +58,7 @@ This is a simple script that renders a Markdown file into HTML on localhost.
 ## jsontree.py
 
 This script takes a JSON file and prints its structure in a tree format (the values are not displayed).
+
+## eval_cpp.py
+
+[eval_cpp](./eval_cpp/) is script that takes a C/C++ expression snippets and evaluates them by compiling and running them.
