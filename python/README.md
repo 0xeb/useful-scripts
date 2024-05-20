@@ -2,17 +2,7 @@
 
 The following is a list of scripts that I've written over the years. Some of them are useful, some of them are not. Some of them are just experiments.
 
-To install the scripts, simply run `setup.py` as such:
-
-```python
-python setup.py develop
-```
-
-And to uninstall, just type:
-
-```python
-pip uninstall useful_scripts
-```
+To install the scripts, simply run `pip install -e .`. To uninstall, just type `pip uninstall useful_scripts`
 
 ## asm_emit.py
 
