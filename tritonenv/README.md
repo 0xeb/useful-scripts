@@ -4,13 +4,12 @@
 
 # Building Triton
 
-1. Prepare all of the dependencies and build them ([z3](https://github.com/Z3Prover/z3),[capstone](https://github.com/capstone-engine/capstone), [boost](https://github.com/boostorg/boost))
-2. Edit [triton.env](triton.env) accordingly
+1. Prepare all of the dependencies and build them ([z3](https://github.com/Z3Prover/z3),[capstone (tag: 5.0)](https://github.com/capstone-engine/capstone), [boost](https://github.com/boostorg/boost))
+2. Edit [triton.env](triton.env) accordingly or make a copy and edit it in the Triton source folder
 3. From Triton's source code directory, run `tritonenv.bat init-triton build64`
 
 This will create the `build64` folder and run's CMake to generate the Visual Studio solution.
 Feel free to edit `tritonenv.bat` as well.
-
 
 # Building standalone apps that use Triton
 
