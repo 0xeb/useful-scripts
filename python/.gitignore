@@ -1,2 +1,4 @@
+useful_libs.egg-info/
 useful_scripts.egg-info/
 *.pyc
+__pycache__/

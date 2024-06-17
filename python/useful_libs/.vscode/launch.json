@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "py: current",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "test_mdparser",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/test_mdparser.py",
+            "args": [
+                "--update-logo",
+                "logo.png"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}

@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "useful_libs"
+version = "0.1.0"
+description = "A useful_libs (various Python libraries)"
+authors = [{name = "Elias Bachaalany", email = "elias.bachaalany@gmail.com"}]
+dependencies = [
+    "toml>=0.10.2"
+]
+
+[project.license]
+text = "Apache-2.0"

@@ -1,0 +1,16 @@
+{
+    "[python]": {
+        "editor.formatOnType": true
+    },
+    "github.copilot.enable": {
+        "*": true,
+        "plaintext": true,
+        "markdown": true,
+        "scminput": false
+    },
+    "files.exclude": {
+        "**.db": true,
+        "**/__pycache__": true,
+        "**/useful_libs.egg-info": true
+    }
+}
