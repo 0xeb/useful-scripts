@@ -69,3 +69,15 @@ Converts a codebase or individual files into a structured Markdown document suit
 - Binary file detection and skipping
 - Configurable file size limits
 - Generates Markdown with syntax-highlighted code blocks
+
+## qslideshow.py
+
+Cross-platform image slideshow viewer with rich features for displaying image collections. Features include:
+- Supports multiple image formats (jpg, png, gif, bmp, tiff, webp, ico, svg)
+- Recursive directory scanning with pattern exclusion (`-x` flag)
+- Keyboard shortcuts for navigation and control (arrows, space, F for fullscreen, R for repeat, etc.)
+- Customizable status line with template variables (e.g., `--status "$1"` for presets or custom templates)
+- Multiple display modes: fullscreen, always-on-top, shuffle, repeat
+- Adjustable slideshow speed with real-time control (+/- keys)
+- Response file support for image lists (`@file.txt`)
+- Fit modes: shrink-to-fit (default) or original size

@@ -6,6 +6,7 @@ setup(
     packages=find_packages(),
    install_requires=[
         'markdown2',
+        'Pillow',
     ],
     entry_points={
         'console_scripts': [
@@ -18,6 +19,7 @@ setup(
             'jsontree = jsontree:main',            
             'markdown_render = markdown_render:main',
             'src_to_llm_context = src_to_llm_context:main',
+            'qslideshow = qslideshow:main',
             #'preprocess = preprocess:main',
         ],
     }
