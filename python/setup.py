@@ -17,6 +17,7 @@ setup(
             'parse_vcf = parse_vcf:main',
             'jsontree = jsontree:main',            
             'markdown_render = markdown_render:main',
+            'src_to_llm_context = src_to_llm_context:main',
             #'preprocess = preprocess:main',
         ],
     }

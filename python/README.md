@@ -60,3 +60,12 @@ This script takes a JSON file and prints its structure in a tree format (the val
 ## pyast.py
 
 `pyast.py` analyzes and extracts elements from Python source files using AST parsing. It can dump global functions, variables, classes, and import statements from a specified file.
+
+## src_to_llm_context.py
+
+Converts a codebase or individual files into a structured Markdown document suitable for LLM context or documentation. Features include:
+- Single file or directory scanning (with recursive option)
+- File filtering by extension patterns (e.g., `*.py`, `*.js`)
+- Binary file detection and skipping
+- Configurable file size limits
+- Generates Markdown with syntax-highlighted code blocks
