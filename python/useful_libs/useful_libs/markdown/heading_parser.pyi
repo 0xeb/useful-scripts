@@ -1,0 +1,26 @@
+from typing import Any, Dict, List, Optional, Tuple
+
+class MarkdownHeading:
+    level: int
+    title: str
+    contents: List[str]
+    subheadings: List[MarkdownHeading]
+    
+    def __init__(self, level: int, title: str) -> None: ...
+    def add_subheading(self, subheading: MarkdownHeading) -> None: ...
+    def __str__(self) -> str: ...
+
+class MarkdownDict:
+    data: Dict[str, Any]
+    
+    def __init__(self, data: Dict[str, Any]) -> None: ...
+    def __getitem__(self, key: str) -> Any: ...
+    def get_val(
+        self, 
+        path: str, 
+        default: Optional[Any] = None, 
+        check_title: bool = False
+    ) -> Any: ...
+
+def parse_markdown(text: str) -> Tuple[List[MarkdownHeading], MarkdownDict]: ...
+def print_headings(heading: MarkdownHeading, indent: int = 0) -> None: ...
