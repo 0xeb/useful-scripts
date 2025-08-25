@@ -53,12 +53,12 @@ class WebSlideshow {
     setupWakeLock() {
         // Check if Wake Lock API is available
         if ('wakeLock' in navigator) {
-            // Request wake lock when not paused
+            // Request wake lock on initialization (regardless of pause state)
             this.requestWakeLock();
             
             // Re-acquire wake lock when page becomes visible
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && !this.isPaused) {
+                if (document.visibilityState === 'visible') {
                     this.requestWakeLock();
                 }
             });
@@ -70,7 +70,7 @@ class WebSlideshow {
     }
     
     async requestWakeLock() {
-        if ('wakeLock' in navigator && !this.isPaused) {
+        if ('wakeLock' in navigator) {
             try {
                 this.wakeLock = await navigator.wakeLock.request('screen');
                 this.updateWakeLockStatus(true);
@@ -110,6 +110,7 @@ class WebSlideshow {
         const video = document.createElement('video');
         video.setAttribute('playsinline', '');
         video.setAttribute('muted', '');
+        video.setAttribute('loop', '');
         video.style.position = 'absolute';
         video.style.width = '1px';
         video.style.height = '1px';
@@ -118,10 +119,8 @@ class WebSlideshow {
         video.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAs1tZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE0OCByMjYwMSBhMGNkN2QzIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNSAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTEgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTEwIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAAD2WIhAA3//728P4FNjuZQQAAAu5tb292AAAAbG12aGQAAAAAAAAAAAAAAAAAAAPoAAAAZAABAAABAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACGHRyYWsAAABcdGtoZAAAAAMAAAAAAAAAAAAAAAEAAAAAAAAAZAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAgAAAAIAAAAAACRlZHRzAAAAHGVsc3QAAAAAAAAAAQAAAGQAAAAAAAEAAAAAAZBtZGlhAAAAIG1kaGQAAAAAAAAAAAAAAAAAACgAAAAEAFXEAAAAAAAtaGRscgAAAAAAAAAAdmlkZQAAAAAAAAAAAAAAAFZpZGVvSGFuZGxlcgAAAAE7bWluZgAAABR2bWhkAAAAAQAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAAA+3N0YmwAAACXc3RzZAAAAAAAAAABAAAAh2F2YzEAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAgACAEgAAABIAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY//8AAAAxYXZjQwFkAAr/4QAYZ2QACqzZX4iIhAAAAwAEAAADAFA8SJZYAQAGaOvjyyLAAAAAGHN0dHMAAAAAAAAAAQAAAAEAAAQAAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAABAAAAAQAAABRzdHN6AAAAAAAAAsUAAAABAAAAFHN0Y28AAAAAAAAAAQAAADAAAABidWR0YQAAAFptZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAAC1pbHN0AAAAJal0b28AAAAdZGF0YQAAAAEAAAAATGF2ZjU2LjQwLjEwMQ==';
         document.body.appendChild(video);
         
-        // Play when slideshow is active
-        if (!this.isPaused) {
-            video.play().catch(() => {});
-        }
+        // Always play the video to keep screen awake (regardless of pause state)
+        video.play().catch(() => {});
         
         this.noSleepVideo = video;
     }
@@ -293,16 +292,9 @@ class WebSlideshow {
                 this.isPaused = result.is_paused;
                 if (this.isPaused) {
                     this.resetTimer();
-                    this.releaseWakeLock();
-                    if (this.noSleepVideo) {
-                        this.noSleepVideo.pause();
-                    }
+                    // Keep wake lock active even when paused
                 } else {
                     this.startAutoAdvance();
-                    this.requestWakeLock();
-                    if (this.noSleepVideo) {
-                        this.noSleepVideo.play().catch(() => {});
-                    }
                 }
                 this.updateStatus();
             }
