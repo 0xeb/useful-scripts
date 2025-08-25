@@ -10,6 +10,12 @@ import random
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import fnmatch
+import http.server
+import json
+import mimetypes
+import threading
+import uuid
+from urllib.parse import parse_qs, urlparse
 
 # Available template variables for status display and script execution
 TEMPLATE_VARIABLES = {
@@ -74,11 +80,13 @@ def parse_arguments():
         status_presets_lines.append(f"  --status {key}   {user_friendly_val}")
 
     parser = argparse.ArgumentParser(
-        description='Cross-platform image slideshow viewer',
+        description='Cross-platform image slideshow viewer with web server mode',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f'''
 Examples:
-  %(prog)s /path/to/images
+  %(prog)s /path/to/images                    # GUI mode
+  %(prog)s /path/to/images --web              # Web server mode
+  %(prog)s /path/to/images --web --port 8080  # Web server on custom port
   %(prog)s /path/to/images --recursive --speed 5
   %(prog)s @image_list.txt --repeat
   %(prog)s . -r -x "*.gif" -x "*.ico"
@@ -157,6 +165,20 @@ Template variables:
         '--shuffle',
         action='store_true',
         help='Randomize image order'
+    )
+    
+    parser.add_argument(
+        '--web', '--server',
+        action='store_true',
+        dest='web',
+        help='Run as web server instead of GUI'
+    )
+    
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=8000,
+        help='Port for web server mode (default: 8000)'
     )
     
     return parser.parse_args()
@@ -756,6 +778,330 @@ class ImageSlideshow:
         self.root.mainloop()
 
 
+class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
+    """HTTP request handler for web slideshow."""
+    
+    def __init__(self, *args, web_slideshow=None, **kwargs):
+        self.web_slideshow = web_slideshow
+        super().__init__(*args, **kwargs)
+    
+    def log_message(self, format, *args):
+        """Override to reduce verbosity."""
+        pass  # Suppress default logging
+    
+    def do_GET(self):
+        """Handle GET requests."""
+        parsed_path = urlparse(self.path)
+        path = parsed_path.path
+        
+        # Serve main HTML file
+        if path == '/' or path == '/index.html':
+            self.serve_html()
+        # Serve JavaScript file
+        elif path == '/qslideshow.js':
+            self.serve_javascript()
+        # API endpoints
+        elif path == '/api/images':
+            self.serve_image_list()
+        elif path.startswith('/api/image/'):
+            self.serve_image(path)
+        elif path == '/api/status':
+            self.serve_status()
+        elif path == '/api/config':
+            self.serve_config()
+        else:
+            self.send_error(404, "Not Found")
+    
+    def do_POST(self):
+        """Handle POST requests."""
+        if self.path == '/api/control':
+            self.handle_control()
+        else:
+            self.send_error(404, "Not Found")
+    
+    def get_session_id(self):
+        """Get or create session ID from cookies."""
+        cookie_header = self.headers.get('Cookie', '')
+        session_id = None
+        
+        if cookie_header:
+            for cookie in cookie_header.split(';'):
+                if '=' in cookie:
+                    name, value = cookie.strip().split('=', 1)
+                    if name == 'slideshow_session':
+                        session_id = value
+                        break
+        
+        return session_id
+    
+    def serve_html(self):
+        """Serve the main HTML page."""
+        # Try to load external HTML file first
+        html_file = Path(__file__).parent / 'qslideshow.htm'
+        
+        if not html_file.exists():
+            self.send_error(500, "Server misconfiguration: qslideshow.htm not found")
+            return
+        
+        with open(html_file, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # Create or get session
+        session_id = self.get_session_id()
+        if not session_id or session_id not in self.web_slideshow.sessions:
+            session_id = str(uuid.uuid4())
+            self.web_slideshow.create_session(session_id)
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html')
+        self.send_header('Set-Cookie', f'slideshow_session={session_id}; Path=/; HttpOnly')
+        self.end_headers()
+        self.wfile.write(html_content.encode())
+    
+    def serve_javascript(self):
+        """Serve the JavaScript file."""
+        # Try to load external JS file first
+        js_file = Path(__file__).parent / 'qslideshow.js'
+        
+        if not js_file.exists():
+            self.send_error(500, "Server misconfiguration: qslideshow.js not found")
+            return
+
+        with open(js_file, 'r', encoding='utf-8') as f:
+            js_content = f.read()
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/javascript')
+        self.end_headers()
+        self.wfile.write(js_content.encode())
+    
+    def serve_image_list(self):
+        """Serve the list of images."""
+        session_id = self.get_session_id()
+        if not session_id or session_id not in self.web_slideshow.sessions:
+            self.send_error(401, "No session")
+            return
+        
+        image_list = []
+        for i, path in enumerate(self.web_slideshow.image_paths):
+            image_list.append({
+                'index': i,
+                'name': path.name,
+                'path': str(path)
+            })
+        
+        response = {'images': image_list}
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(response).encode())
+    
+    def serve_image(self, path):
+        """Serve an image file."""
+        try:
+            index = int(path.split('/')[-1])
+            if 0 <= index < len(self.web_slideshow.image_paths):
+                image_path = self.web_slideshow.image_paths[index]
+                
+                if image_path.exists():
+                    mime_type, _ = mimetypes.guess_type(str(image_path))
+                    if not mime_type:
+                        mime_type = 'application/octet-stream'
+                    
+                    self.send_response(200)
+                    self.send_header('Content-Type', mime_type)
+                    self.send_header('Cache-Control', 'max-age=3600')
+                    self.end_headers()
+                    
+                    with open(image_path, 'rb') as f:
+                        self.wfile.write(f.read())
+                else:
+                    self.send_error(404, "Image not found")
+            else:
+                self.send_error(404, "Invalid image index")
+        except (ValueError, IndexError):
+            self.send_error(400, "Invalid request")
+    
+    def serve_status(self):
+        """Serve current status for this session."""
+        session_id = self.get_session_id()
+        if not session_id or session_id not in self.web_slideshow.sessions:
+            self.send_error(401, "No session")
+            return
+        
+        session = self.web_slideshow.sessions[session_id]
+        status_text = session.format_status() if session.status_format else ""
+        
+        response = {
+            'current_index': session.current_index,
+            'total_images': len(self.web_slideshow.image_paths),
+            'is_paused': session.is_paused,
+            'speed': session.speed_seconds,
+            'repeat': session.repeat,
+            'shuffle': session.shuffle,
+            'status_text': status_text
+        }
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(response).encode())
+    
+    def serve_config(self):
+        """Serve configuration."""
+        session_id = self.get_session_id()
+        if not session_id or session_id not in self.web_slideshow.sessions:
+            self.send_error(401, "No session")
+            return
+        
+        session = self.web_slideshow.sessions[session_id]
+        
+        config = {
+            'speed': session.speed_seconds,
+            'repeat': session.repeat,
+            'shuffle': session.shuffle,
+            'fit_mode': session.fit_mode,
+            'always_on_top': session.always_on_top
+        }
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(config).encode())
+    
+    def handle_control(self):
+        """Handle control commands."""
+        session_id = self.get_session_id()
+        if not session_id or session_id not in self.web_slideshow.sessions:
+            self.send_error(401, "No session")
+            return
+        
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length > 0:
+            post_data = self.rfile.read(content_length)
+            try:
+                data = json.loads(post_data.decode())
+                action = data.get('action')
+                session = self.web_slideshow.sessions[session_id]
+                
+                result = {'success': False}
+                
+                if action == 'next':
+                    session.current_index += 1
+                    if session.current_index >= len(self.web_slideshow.image_paths):
+                        if session.repeat:
+                            session.current_index = 0
+                            session.repeat_count += 1
+                        else:
+                            session.current_index = len(self.web_slideshow.image_paths) - 1
+                    result = {'success': True, 'current_index': session.current_index}
+                
+                elif action == 'previous':
+                    session.current_index -= 1
+                    if session.current_index < 0:
+                        if session.repeat:
+                            session.current_index = len(self.web_slideshow.image_paths) - 1
+                        else:
+                            session.current_index = 0
+                    result = {'success': True, 'current_index': session.current_index}
+                
+                elif action == 'toggle_pause':
+                    session.is_paused = not session.is_paused
+                    result = {'success': True, 'is_paused': session.is_paused}
+                
+                elif action == 'toggle_repeat':
+                    session.repeat = not session.repeat
+                    result = {'success': True, 'repeat': session.repeat}
+                
+                elif action == 'toggle_shuffle':
+                    session.shuffle = not session.shuffle
+                    if session.shuffle:
+                        # Note: In web mode, shuffle affects display order but not the actual list
+                        pass
+                    result = {'success': True, 'shuffle': session.shuffle}
+                
+                elif action == 'increase_speed':
+                    session.speed_seconds += 1.0
+                    result = {'success': True, 'speed': session.speed_seconds}
+                
+                elif action == 'decrease_speed':
+                    if session.speed_seconds > 0.1:
+                        session.speed_seconds = max(0.1, session.speed_seconds - 1.0)
+                    result = {'success': True, 'speed': session.speed_seconds}
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(result).encode())
+                
+            except json.JSONDecodeError:
+                self.send_error(400, "Invalid JSON")
+        else:
+            self.send_error(400, "No data")
+
+
+class WebSlideshow:
+    """Web-based slideshow server."""
+    
+    def __init__(self, image_paths: List[Path], config: Dict[str, Any], port: int = 8000):
+        """
+        Initialize web slideshow server.
+        
+        Args:
+            image_paths: List of image paths to serve
+            config: Configuration dictionary
+            port: Port to run server on
+        """
+        self.image_paths = image_paths
+        self.original_image_paths = image_paths.copy()
+        self.config = config
+        self.port = port
+        self.sessions = {}  # session_id -> SlideshowContext
+        
+        # Apply shuffle to the main list if requested
+        if config.get('shuffle', False):
+            random.shuffle(self.image_paths)
+        
+        # Create handler with reference to this slideshow
+        self.handler = lambda *args, **kwargs: WebSlideshowHandler(
+            *args, web_slideshow=self, **kwargs
+        )
+    
+    def create_session(self, session_id: str):
+        """Create a new session for a client."""
+        # Each session gets its own context
+        session = SlideshowContext(
+            image_paths=self.image_paths,  # Share the same image list
+            speed=self.config.get('speed', 3.0),
+            repeat=self.config.get('repeat', False),
+            fit_mode=self.config.get('fit_mode', 'shrink'),
+            status_format=self.config.get('status_format'),
+            always_on_top=self.config.get('always_on_top', False),
+            shuffle=self.config.get('shuffle', False)
+        )
+        session.current_index = 0  # Each client starts at image 0
+        # Set current_image to None as we don't load images in web mode
+        session.current_image = None
+        self.sessions[session_id] = session
+        return session
+    
+    def run(self):
+        """Start the web server."""
+        server_address = ('', self.port)
+        httpd = http.server.HTTPServer(server_address, self.handler)
+        
+        print(f"Web slideshow server running on:")
+        print(f"  http://localhost:{self.port}")
+        print(f"  http://0.0.0.0:{self.port}")
+        print(f"\nServing {len(self.image_paths)} images")
+        print("Press Ctrl+C to stop the server")
+        
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\nServer stopped.")
+
+
 def find_images(directory: Path, recursive: bool, exclude_patterns: List[str]) -> List[Path]:
     """Find all image files in a directory, case-insensitively."""
     if not directory.is_dir():
@@ -814,9 +1160,6 @@ def main():
     # Parse arguments first
     args = parse_arguments()
     
-    # Import dependencies after argument parsing
-    import_dependencies()
-    
     # Parse exclude patterns
     exclude_patterns = []
     if args.exclude:
@@ -846,22 +1189,50 @@ def main():
     if args.status:
         status_format = get_status_template(args.status)
     
-    # Create and run slideshow
-    slideshow = ImageSlideshow(
-        image_files,
-        speed=args.speed,
-        repeat=args.repeat,
-        fit_mode=args.fit_mode,
-        status_format=status_format,
-        always_on_top=args.always_on_top,
-        shuffle=args.shuffle
-    )
-    
-    try:
-        slideshow.run()
-    except KeyboardInterrupt:
-        print("\nSlideshow interrupted.")
-        sys.exit(0)
+    # Check if web mode is requested
+    if args.web:
+        # Run as web server
+        config = {
+            'speed': args.speed,
+            'repeat': args.repeat,
+            'fit_mode': args.fit_mode,
+            'status_format': status_format,
+            'always_on_top': args.always_on_top,
+            'shuffle': args.shuffle
+        }
+        
+        web_slideshow = WebSlideshow(
+            image_files,
+            config=config,
+            port=args.port
+        )
+        
+        try:
+            web_slideshow.run()
+        except KeyboardInterrupt:
+            print("\nWeb server stopped.")
+            sys.exit(0)
+    else:
+        # Run traditional tkinter GUI
+        # Import dependencies after argument parsing and only when needed
+        import_dependencies()
+        
+        # Create and run slideshow
+        slideshow = ImageSlideshow(
+            image_files,
+            speed=args.speed,
+            repeat=args.repeat,
+            fit_mode=args.fit_mode,
+            status_format=status_format,
+            always_on_top=args.always_on_top,
+            shuffle=args.shuffle
+        )
+        
+        try:
+            slideshow.run()
+        except KeyboardInterrupt:
+            print("\nSlideshow interrupted.")
+            sys.exit(0)
 
 
 if __name__ == '__main__':
