@@ -4,7 +4,6 @@ Cross-platform image slideshow viewer.
 """
 
 import argparse
-import os
 import sys
 import random
 from pathlib import Path
@@ -13,9 +12,8 @@ import fnmatch
 import http.server
 import json
 import mimetypes
-import threading
 import uuid
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 # Available template variables for status display and script execution
 TEMPLATE_VARIABLES = {
@@ -798,8 +796,11 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         if path == '/' or path == '/index.html':
             self.serve_html()
         # Serve JavaScript file
-        elif path == '/qslideshow.js':
+        elif path == '/slideshow.js':
             self.serve_javascript()
+        # Serve manifest file for PWA
+        elif path == '/app.manifest':
+            self.serve_manifest()
         # API endpoints
         elif path == '/api/images':
             self.serve_image_list()
@@ -837,10 +838,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
     def serve_html(self):
         """Serve the main HTML page."""
         # Try to load external HTML file first
-        html_file = Path(__file__).parent / 'qslideshow.htm'
+        html_file = Path(__file__).parent / 'web' / 'index.html'
         
         if not html_file.exists():
-            self.send_error(500, "Server misconfiguration: qslideshow.htm not found")
+            self.send_error(500, "Server misconfiguration: index.html not found")
             return
         
         with open(html_file, 'r', encoding='utf-8') as f:
@@ -861,10 +862,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
     def serve_javascript(self):
         """Serve the JavaScript file."""
         # Try to load external JS file first
-        js_file = Path(__file__).parent / 'qslideshow.js'
+        js_file = Path(__file__).parent / 'web' / 'slideshow.js'
         
         if not js_file.exists():
-            self.send_error(500, "Server misconfiguration: qslideshow.js not found")
+            self.send_error(500, "Server misconfiguration: slideshow.js not found")
             return
 
         with open(js_file, 'r', encoding='utf-8') as f:
@@ -874,6 +875,31 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'application/javascript')
         self.end_headers()
         self.wfile.write(js_content.encode())
+    
+    def serve_manifest(self):
+        """Serve the PWA manifest file."""
+        manifest_file = Path(__file__).parent / 'web' / 'app.manifest'
+        
+        if not manifest_file.exists():
+            # Serve a default manifest if file doesn't exist
+            manifest = {
+                "name": "Web Slideshow",
+                "short_name": "Slideshow",
+                "display": "fullscreen",
+                "orientation": "any",
+                "start_url": "/",
+                "background_color": "#000000",
+                "theme_color": "#000000"
+            }
+            manifest_content = json.dumps(manifest)
+        else:
+            with open(manifest_file, 'r', encoding='utf-8') as f:
+                manifest_content = f.read()
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/manifest+json')
+        self.end_headers()
+        self.wfile.write(manifest_content.encode())
     
     def serve_image_list(self):
         """Serve the list of images."""

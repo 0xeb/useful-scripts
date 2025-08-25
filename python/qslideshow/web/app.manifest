@@ -1,0 +1,19 @@
+{
+  "name": "Web Quick Slideshow",
+  "short_name": "QSlideshow",
+  "description": "Full-featured image slideshow viewer",
+  "display": "fullscreen",
+  "orientation": "any",
+  "start_url": "/",
+  "scope": "/",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%23000'/%3E%3Ctext x='96' y='120' font-family='Arial' font-size='100' fill='%23fff' text-anchor='middle'%3E🖼%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

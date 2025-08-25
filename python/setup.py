@@ -4,10 +4,14 @@ setup(
     name='useful_scripts',
     version='0.1.0',
     packages=find_packages(),
-   install_requires=[
+    install_requires=[
         'markdown2',
         'Pillow',
     ],
+    package_data={
+        'qslideshow': ['web/*'],
+    },
+    include_package_data=True,
     entry_points={
         'console_scripts': [
             'ApplyDiff = ApplyDiff:main',
