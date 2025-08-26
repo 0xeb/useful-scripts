@@ -2,14 +2,26 @@
 
 import sys
 import base64
+import argparse
+import os
 
 def main():
+    parser = argparse.ArgumentParser(description='Parse VCF contact files and extract individual contacts')
+    parser.add_argument('vcf_file', help='VCF file to parse')
+    parser.add_argument('-o', '--output-dir', default='.', help='Output directory for individual VCF files (default: current directory)')
+    
+    args = parser.parse_args()
+    
     # Open the VCF file
     try:
-        vcf_file = open(sys.argv[1], 'r')
-    except:
-        print("Error: Could not open file")
+        vcf_file = open(args.vcf_file, 'r')
+    except Exception as e:
+        print(f"Error: Could not open file '{args.vcf_file}': {e}")
         sys.exit(1)
+    
+    # Create output directory if it doesn't exist
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
 
     # Parse the VCF file
     contacts = []
@@ -52,7 +64,8 @@ def main():
             serial_number += 1
         
         # Create a new VCF file for the contact
-        vcf_out = open(name + '.vcf', 'w')
+        vcf_path = os.path.join(args.output_dir, name + '.vcf')
+        vcf_out = open(vcf_path, 'w')
         
         # Write the contact information to the VCF file
         vcf_out.write('BEGIN:VCARD\n')
@@ -69,7 +82,8 @@ def main():
             photo_data = contact['PHOTO;ENCODING=BASE64']
             photo_data = photo_data.encode('utf-8')
             photo_data = base64.decodebytes(photo_data)
-            photo_out = open(name + '.jpeg', 'wb')
+            photo_path = os.path.join(args.output_dir, name + '.jpeg')
+            photo_out = open(photo_path, 'wb')
             photo_out.write(photo_data)
             photo_out.close()
 

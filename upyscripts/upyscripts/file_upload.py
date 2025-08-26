@@ -84,5 +84,29 @@ def upload_file():
         file.save(filepath)
         return f'File uploaded successfully: {filename}'
 
+def main():
+    """Main entry point for the file upload server."""
+    import argparse
+    parser = argparse.ArgumentParser(description='Simple file upload server')
+    parser.add_argument('--port', type=int, default=5000, help='Port to run the server on (default: 5000)')
+    parser.add_argument('--host', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
+    parser.add_argument('--upload-dir', default='./uploads', help='Directory to store uploaded files (default: ./uploads)')
+    parser.add_argument('--debug', action='store_true', help='Run in debug mode')
+    
+    args = parser.parse_args()
+    
+    # Update upload folder based on argument
+    global UPLOAD_FOLDER
+    UPLOAD_FOLDER = args.upload_dir
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    
+    # Make sure the upload folder exists
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
+    
+    print(f"Starting file upload server on http://{args.host}:{args.port}")
+    print(f"Upload directory: {os.path.abspath(UPLOAD_FOLDER)}")
+    app.run(debug=args.debug, host=args.host, port=args.port)
+
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    main()

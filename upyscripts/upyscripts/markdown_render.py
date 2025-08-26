@@ -43,7 +43,10 @@ def render_markdown_to_html_github(markdown_content):
         print(f"Error: {response.status_code}")
         return None
 
-def main(use_github, port):
+def serve_markdown(use_github=False, port=None):
+    if port is None:
+        port = DEFAULT_PORT
+        
     class MarkdownHTTPHandler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
             file_path = self.path.strip("/")
@@ -71,12 +74,22 @@ def main(use_github, port):
 
     with socketserver.TCPServer(("", port), MarkdownHTTPHandler) as httpd:
         print(f"Serving at port {port}")
-        httpd.serve_forever()
+        print("Press Ctrl+C to stop the server")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\nShutting down server...")
+
+def main():
+    parser = argparse.ArgumentParser(description='Markdown Renderer - Serves markdown files as HTML via HTTP')
+    parser.add_argument('-g', '--github', action='store_true', help='Use GitHub API for rendering')
+    parser.add_argument('-p', '--port', type=int, default=DEFAULT_PORT, help=f'Port number to serve on (default: {DEFAULT_PORT})')
+    parser.add_argument('--serve', action='store_true', help='Start the server (default action when no arguments given)')
+    
+    args = parser.parse_args()
+    
+    # Start the server
+    serve_markdown(args.github, args.port)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Markdown Renderer')
-    parser.add_argument('-g', '--github', action='store_true', help='Use GitHub API for rendering')
-    parser.add_argument('-p', '--port', type=int, default=DEFAULT_PORT, help='Port number to serve on (default: 8080)')
-    args = parser.parse_args()
-
-    main(args.github, args.port)
+    main()

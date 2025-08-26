@@ -84,34 +84,26 @@ def show_help(err_msg = None):
 
 
 # --------------------------------------------------------------------------------------------
-def main(argv):
-    verify = True
-    bin_file = diff_file = None
-
-    try:
-        opts, args = getopt.getopt(argv, "fi:o:",["ifile=","ofile="])
-    except getopt.GetoptError as e:
-        show_help(str(e))
-        return
-
-    for opt, arg in opts:
-        if opt == '-f':
-            verify = False
-        elif opt in ("-i", "--ifile"):
-            diff_file = arg
-        elif opt in ("-o", "--ofile"):
-            bin_file = arg
-
-    if bin_file is None or diff_file is None:
-        show_help()
-        return
-
-    ok, msg = apply_diff(diff_file, bin_file, verify)
+def main(argv=None):
+    import argparse
+    parser = argparse.ArgumentParser(description='Apply a DIFF file to a binary file')
+    parser.add_argument('-i', '--ifile', required=True, help='Diff input file')
+    parser.add_argument('-o', '--ofile', required=True, help='Binary output file to patch')
+    parser.add_argument('-f', '--force', action='store_true', help='Force patch without verification')
+    
+    if argv is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(argv)
+    
+    verify = not args.force
+    ok, msg = apply_diff(args.ifile, args.ofile, verify)
     if not ok:
         print(f"Error: {msg}")
+        sys.exit(1)
     else:
         print(msg)
 
 if __name__ == "__main__":
-   main(sys.argv[1:])
+   main()
 
