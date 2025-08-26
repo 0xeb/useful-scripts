@@ -1,0 +1,5 @@
+_plan/
+.DS_Store
+*.pyc
+__pycache__/
+upyscripts.egg-info/

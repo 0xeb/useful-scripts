@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "dll2proj.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/dll2proj.py",
+            "args": ["-d", "test/lz4.dll", "-p", "lz4-p"],
+            "console": "integratedTerminal"
+        }
+    ]
+}

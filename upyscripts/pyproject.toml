@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "upyscripts"
+version = "0.1.0"
+description = "A collection of useful Python utility scripts and tools"
+readme = "README.md"
+authors = [
+    {name = "Elias Bachaalany", email = "elias.bachaalany@gmail.com"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.7"
+dependencies = [
+    "markdown2",
+    "flask",
+    "werkzeug",
+    "Pillow",
+    "PyMuPDF",
+    "requests",
+    "pefile",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[project.scripts]
+"upy.applydiff" = "upyscripts.applydiff:main"
+"upy.asm_emit" = "upyscripts.asm_emit:main"
+"upy.file_upload" = "upyscripts.file_upload:main"
+"upy.html_entities" = "upyscripts.html_entities:main"
+"upy.jsontree" = "upyscripts.jsontree:main"
+"upy.markdown_render" = "upyscripts.markdown_render:main"
+"upy.mdcomdec" = "upyscripts.mdcomdec:main"
+"upy.parse_vcf" = "upyscripts.parse_vcf:main"
+"upy.pdf3img" = "upyscripts.pdf3img:main"
+"upy.preprocess" = "upyscripts.preprocess:main"
+"upy.pyast" = "upyscripts.pyast:main"
+"upy.src2llm" = "upyscripts.src_to_llm_context:main"
+"upy.qslideshow" = "upyscripts.qslideshow.cli:main"
+"upy.dll2proj" = "upyscripts.dll2proj.dll2proj:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/upyscripts"
+Repository = "https://github.com/yourusername/upyscripts"
+Issues = "https://github.com/yourusername/upyscripts/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["upyscripts*"]

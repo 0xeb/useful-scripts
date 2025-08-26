@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- PWA and iOS specific meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Slideshow">
+    <meta name="application-name" content="Web Slideshow">
+    <meta name="theme-color" content="#000000">
+    
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/app.manifest">
+    
+    <title>Web Slideshow</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #000; 
+            overflow: hidden; 
+            font-family: Arial, sans-serif;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        #slideshow-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        #status-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 14px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 3px;
+            z-index: 1000;
+        }
+        #controls-hint {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+        }
+        #help-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 2000;
+            max-width: 400px;
+        }
+        #help-modal h3 {
+            margin-bottom: 10px;
+        }
+        #help-modal .shortcut {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        #help-modal .key {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        #install-prompt {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            z-index: 3000;
+            text-align: center;
+            max-width: 300px;
+        }
+        #install-prompt button {
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #wake-lock-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #4CAF50;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <img id="slideshow-image" src="" alt="Slideshow">
+        <div id="status-overlay"></div>
+        <div id="wake-lock-status"></div>
+        <div id="controls-hint">Press H for help</div>
+    </div>
+    <div id="install-prompt">
+        <div>For the best fullscreen experience on iPad/iPhone:</div>
+        <button onclick="showInstallInstructions()">How to Install</button>
+        <button onclick="dismissInstallPrompt()">Dismiss</button>
+    </div>
+    <div id="help-modal">
+        <h3>Keyboard Shortcuts</h3>
+        <div class="shortcut"><span class="key">←/→</span><span>Previous/Next image</span></div>
+        <div class="shortcut"><span class="key">Space/Enter</span><span>Pause/Resume</span></div>
+        <div class="shortcut"><span class="key">F</span><span>Toggle fullscreen</span></div>
+        <div class="shortcut"><span class="key">R</span><span>Toggle repeat</span></div>
+        <div class="shortcut"><span class="key">S</span><span>Toggle shuffle</span></div>
+        <div class="shortcut"><span class="key">T</span><span>Picture-in-Picture</span></div>
+        <div class="shortcut"><span class="key">+/-</span><span>Adjust speed</span></div>
+        <div class="shortcut"><span class="key">H</span><span>Show/Hide help</span></div>
+        <div class="shortcut"><span class="key">Q/Esc</span><span>Close help</span></div>
+    </div>
+    <script src="slideshow.js"></script>
+</body>
+</html>
