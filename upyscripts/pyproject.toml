@@ -57,6 +57,7 @@ dev = [
 "upy.src2llm" = "upyscripts.src_to_llm_context:main"
 "upy.qslideshow" = "upyscripts.qslideshow.cli:main"
 "upy.dll2proj" = "upyscripts.dll2proj.dll2proj:main"
+"upy.help" = "upyscripts.help_command:main"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/upyscripts"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 PDF Image Converter
-Bidirectional tool to extract images from PDFs or compile images into PDFs
+A tool to extract images from PDFs or compile images into PDFs
 """
 
 import os
@@ -303,7 +303,7 @@ def process_extraction(input_path, output_base_dir=None, recursive=False):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Bidirectional PDF-Image converter: Extract images from PDFs or compile images into PDFs',
+        description='A PDF-Image converter: Extract images from PDFs or compile images into PDFs',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 EXTRACTION Examples:

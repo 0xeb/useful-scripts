@@ -105,7 +105,7 @@ upy.parse_vcf all_contacts.vcf --format json
 ```
 
 ### pdf3img.py
-Bidirectional PDF-Image converter with two modes:
+A PDF-Image converter with two modes:
 - **Extract**: Extracts unique images from PDFs with automatic deduplication
 - **Compile**: Creates PDFs from image collections
 

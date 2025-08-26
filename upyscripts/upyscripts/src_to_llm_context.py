@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
 """
-src_to_llm_context.py
+Convert codebase to LLM-friendly Markdown format
 
-Convert a codebase or file into a structured Markdown file for LLM context or documentation.
+This tool converts a codebase or file into a structured Markdown file for LLM context or documentation.
+It can process single files or entire directories, automatically detecting and handling binary files.
 
 TODO: Replace print statements with logging for better flexibility.
 """

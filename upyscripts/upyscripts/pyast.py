@@ -1,3 +1,7 @@
+"""
+Analyze Python AST - Extract functions, classes, imports from Python source files
+"""
+
 import ast
 import argparse
 import json
