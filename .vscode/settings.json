@@ -1,6 +1,7 @@
 {
     "cmake.configureOnOpen": false,
     "files.exclude": {
-        "**/*.egg-info": true
+        "**/*.egg-info": true,
+        "**/__pycache__/": true
     }
 }

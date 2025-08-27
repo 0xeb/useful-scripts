@@ -32,6 +32,12 @@ dependencies = [
     "PyMuPDF",
     "requests",
     "pefile",
+    "astral",
+    "matplotlib",
+    "pandas",
+    "numpy",
+    "pytz",
+    "tzlocal",
 ]
 
 [project.optional-dependencies]
@@ -57,6 +63,7 @@ dev = [
 "upy.src2llm" = "upyscripts.src_to_llm_context:main"
 "upy.qslideshow" = "upyscripts.qslideshow.cli:main"
 "upy.dll2proj" = "upyscripts.dll2proj.dll2proj:main"
+"upy.dlcalc" = "upyscripts.dlcalc:main"
 "upy.help" = "upyscripts.help_command:main"
 
 [project.urls]
