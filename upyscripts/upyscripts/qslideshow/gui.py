@@ -225,7 +225,7 @@ class ImageSlideshow:
 
         if image is None:
             # Remove failed image from list to avoid retrying
-            print(f"Removing failed image: {path}")
+            print(f"Removing failed image from list: {path}")
             self.context.image_paths.pop(self.context.current_index)
 
             # Check if we have any images left
