@@ -65,13 +65,40 @@ upy.html_entities input.html > escaped.html
 upy.html_entities raw_content.txt --output safe_content.txt
 ```
 
-### jsontree.py
-Visualizes JSON file structure in a tree format, displaying the hierarchy without values.
+### jsonutils.py
+Comprehensive JSON utility tool with multiple operations: beautify, minify, validate, tree view, and query.
 
 ```bash
-upy.jsontree config.json
-upy.jsontree large_dataset.json --max-depth 3
-cat data.json | upy.jsontree
+# Tree view (default mode, displays JSON structure)
+upy.jsonutils data.json --tree
+upy.jsonutils data.json --tree --max-depth 3
+
+# Beautify/format JSON
+upy.jsonutils data.json --beautify
+upy.jsonutils data.json --beautify --indent 4
+upy.jsonutils data.json --beautify --sort-keys
+cat data.json | upy.jsonutils --beautify > formatted.json
+
+# Minify JSON (remove whitespace)
+upy.jsonutils data.json --minify
+upy.jsonutils data.json --minify -o compact.json
+
+# Validate JSON
+upy.jsonutils data.json --validate
+upy.jsonutils data.json --validate --verbose
+
+# Query JSON using dot notation
+upy.jsonutils data.json --query users.0.name
+upy.jsonutils data.json --query settings.theme.colors
+upy.jsonutils data.json --query items.[2].price
+
+# Read from stdin
+cat data.json | upy.jsonutils --beautify
+echo '{"test": 123}' | upy.jsonutils --tree
+
+# Output to file
+upy.jsonutils data.json --beautify -o formatted.json
+upy.jsonutils data.json --minify --output compact.json
 ```
 
 ### markdown_render.py

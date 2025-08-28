@@ -20,7 +20,7 @@ This installs the following command-line tools with `upy.` prefix:
 - `upy.dll2proj` - Convert DLL to Visual Studio project with function stubs (requires pefile)
 - `upy.file_upload` - File upload utility
 - `upy.html_entities` - Escape HTML entities
-- `upy.jsontree` - Display JSON structure as tree
+- `upy.jsonutils` - JSON utility tool (beautify, minify, validate, tree view, query)
 - `upy.markdown_render` - Render Markdown to HTML on localhost
 - `upy.mdcomdec` - Decompose/recompose Markdown files
 - `upy.parse_vcf` - Parse VCF contact files
