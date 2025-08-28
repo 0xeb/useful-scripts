@@ -235,3 +235,56 @@ def parse_response_file(filepath: Path) -> List[Path]:
         print(f"Error reading response file: {e}")
 
     return image_files
+
+
+def collect_images_from_paths(path_args: List[str], recursive: bool = False, 
+                             exclude_patterns: List[str] = None) -> List[Path]:
+    """
+    Collect image files from multiple paths, handling directories, files, and response files.
+    
+    Args:
+        path_args: List of path strings (directories, files, or @response_files)
+        recursive: Whether to search subdirectories recursively
+        exclude_patterns: List of patterns to exclude from search
+        
+    Returns:
+        List of unique image file paths, preserving discovery order
+    """
+    if exclude_patterns is None:
+        exclude_patterns = []
+        
+    image_files = []
+    
+    for path_arg in path_args:
+        if path_arg.startswith('@'):
+            # Response file
+            response_file = Path(path_arg[1:])
+            image_files.extend(parse_response_file(response_file))
+        else:
+            # Directory or file
+            path = Path(path_arg)
+            if path.is_dir():
+                # Search directory for images
+                images = find_images(path, recursive, exclude_patterns)
+                image_files.extend(images)
+            elif path.is_file():
+                # Single file directly specified
+                if path.suffix.lower() in {ext.lower() for ext in DEFAULT_IMAGE_EXTENSIONS}:
+                    # Check against exclude patterns
+                    if not any(fnmatch.fnmatch(path.name, p) for p in exclude_patterns):
+                        image_files.append(path)
+                else:
+                    print(f"Warning: {path} is not a recognized image file")
+            else:
+                print(f"Warning: Path does not exist: {path}")
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_files = []
+    for f in image_files:
+        resolved = f.resolve()
+        if resolved not in seen:
+            seen.add(resolved)
+            unique_files.append(f)
+    
+    return unique_files

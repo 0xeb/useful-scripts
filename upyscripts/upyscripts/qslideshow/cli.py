@@ -11,11 +11,9 @@ from pathlib import Path
 from .core import (
     TEMPLATE_VARIABLES,
     STATUS_PRESETS,
-    DEFAULT_IMAGE_EXTENSIONS,
     get_variable_descriptions,
     get_status_template,
-    find_images,
-    parse_response_file
+    collect_images_from_paths
 )
 
 
@@ -169,38 +167,12 @@ def main():
             patterns = pattern_arg.split(';')
             exclude_patterns.extend(p.strip() for p in patterns if p.strip())
 
-    # Get image files
-    image_files = []
-    
-    for path_arg in args.paths:
-        if path_arg.startswith('@'):
-            # Response file
-            response_file = Path(path_arg[1:])
-            image_files.extend(parse_response_file(response_file))
-        else:
-            # Directory
-            dir_path = Path(path_arg)
-            if dir_path.is_dir():
-                images = find_images(dir_path, args.recursive, exclude_patterns)
-                image_files.extend(images)
-            elif dir_path.is_file():
-                # Single file directly specified
-                if dir_path.suffix.lower() in {ext.lower() for ext in DEFAULT_IMAGE_EXTENSIONS}:
-                    image_files.append(dir_path)
-                else:
-                    print(f"Warning: {dir_path} is not a recognized image file")
-            else:
-                print(f"Warning: Path does not exist: {dir_path}")
-    
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_files = []
-    for f in image_files:
-        resolved = f.resolve()
-        if resolved not in seen:
-            seen.add(resolved)
-            unique_files.append(f)
-    image_files = unique_files
+    # Collect image files from all specified paths
+    image_files = collect_images_from_paths(
+        args.paths, 
+        recursive=args.recursive,
+        exclude_patterns=exclude_patterns
+    )
 
     if not image_files:
         print("No images found.")
