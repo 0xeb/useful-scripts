@@ -29,6 +29,7 @@ This installs the following command-line tools with `upy.` prefix:
 - `upy.pyast` - Analyze Python AST (functions, classes, imports)
 - `upy.qslideshow` - Cross-platform image slideshow viewer with web server
 - `upy.src2llm` - Convert codebase to LLM-friendly Markdown
+- `upy.dlcalc` - Calculate and visualize daylight hours and sunset times
 
 ### Legacy Tools (python/)
 The `python/` directory contains standalone tools not integrated into upyscripts:
@@ -110,7 +111,7 @@ The `upyscripts` package uses setuptools with `pyproject.toml` configuration. Al
 - The qslideshow tool has a complex architecture with GUI (tkinter), web server (Flask), and PWA components
 
 ### Key Technical Details
-- Python dependencies: markdown2, flask, werkzeug, Pillow, PyMuPDF, requests, pefile
+- Python dependencies: markdown2, flask, werkzeug, Pillow, PyMuPDF, requests, pefile, astral, matplotlib, pandas, numpy, pytz, tzlocal
 - The C projects require Windows/MSVC and use low-level system programming techniques
 - The dll2proj tool (now integrated as upy.dll2proj) requires Windows and the pefile library
 - The eval_cpp tool generates and compiles C++ code dynamically using CMake

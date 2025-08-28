@@ -30,6 +30,7 @@ This installs command-line tools with the `upy.` prefix:
 - `upy.pyast` - Analyze Python AST
 - `upy.qslideshow` - Cross-platform image slideshow viewer with web server
 - `upy.src2llm` - Convert codebase to LLM-friendly Markdown
+- `upy.dlcalc` - Calculate and visualize daylight hours and sunset times for any location
 
 ## Repository Structure
 

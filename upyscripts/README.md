@@ -164,6 +164,35 @@ upy.qslideshow @playlist.txt --repeat --status "$i/$n - $f"
 # vacation/*.jpg
 ```
 
+### dlcalc.py
+Calculate and visualize daylight hours and sunset times for any location worldwide with built-in city database and automatic geocoding support.
+
+```bash
+# Built-in location database
+upy.dlcalc --location "New York"
+upy.dlcalc --location "London" --year 2024
+
+# Geocoded locations (automatic lookup)
+upy.dlcalc --location "Bellevue, Washington"
+upy.dlcalc --location "Paris, France" --gui
+
+# Manual coordinates
+upy.dlcalc --location "My City" --lat 40.7128 --lon -74.0060
+
+# Different output formats
+upy.dlcalc --location "Tokyo" --format json
+upy.dlcalc --location "Berlin" --format plot --output-file daylight.png
+upy.dlcalc --location "Sydney" --format table
+
+# Date range options
+upy.dlcalc --location "Oslo" --start-date 2024-06-01 --end-date 2024-08-31
+upy.dlcalc --location "Reykjavik" --year 2025 --step-days 14
+
+# Offline mode (no geocoding)
+upy.dlcalc --location "Rome" --offline
+upy.dlcalc --list-locations  # List all built-in cities
+```
+
 ### src_to_llm_context.py
 Converts codebases into structured Markdown documents optimized for LLM context:
 
