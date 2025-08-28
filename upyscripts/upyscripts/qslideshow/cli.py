@@ -138,6 +138,12 @@ Template variables:
         help='Port for web server mode (default: 8000)'
     )
 
+    parser.add_argument(
+        '--web-dev',
+        action='store_true',
+        help='Development mode: disable browser caching for live editing of web files'
+    )
+
     # Generate QSS_* environment variable names from TEMPLATE_VARIABLES
     qss_vars = ', '.join(f'QSS_{var.upper()}' for var in TEMPLATE_VARIABLES.keys())
 
@@ -197,7 +203,8 @@ def main():
             'status_format': status_format,
             'always_on_top': args.always_on_top,
             'shuffle': args.shuffle,
-            'paused': args.paused
+            'paused': args.paused,
+            'web_dev': getattr(args, 'web_dev', False)
         }
 
         web_slideshow = WebSlideshow(
@@ -205,6 +212,9 @@ def main():
             config=config,
             port=args.port
         )
+        
+        if args.web_dev:
+            print("🔧 Development mode enabled - browser caching disabled")
 
         try:
             web_slideshow.run()
