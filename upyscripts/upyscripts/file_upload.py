@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 UPLOAD_FOLDER = './uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+DEFAULT_PORT = 5001
 
 # Make sure the upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -88,7 +89,7 @@ def main():
     """Main entry point for the file upload server."""
     import argparse
     parser = argparse.ArgumentParser(description='Simple file upload server')
-    parser.add_argument('--port', type=int, default=5000, help='Port to run the server on (default: 5000)')
+    parser.add_argument('--port', type=int, default=DEFAULT_PORT, help=f'Port to run the server on (default: {DEFAULT_PORT})')
     parser.add_argument('--host', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
     parser.add_argument('--upload-dir', default='./uploads', help='Directory to store uploaded files (default: ./uploads)')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode')
