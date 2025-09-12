@@ -13,6 +13,12 @@ from typing import List, Dict, Any
 from urllib.parse import urlparse
 
 from .core import SlideshowContext
+from .config import ConfigManager
+from .actions import action_registry, ExternalToolManager
+from .hotkeys import HotkeyManager, WebHotkeyAdapter
+from .gestures import GestureManager
+from .history import ActionHistory, UndoAction, RedoAction
+from .trash import TrashManager
 
 
 class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
@@ -49,6 +55,12 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
             self.serve_status()
         elif path == '/api/config':
             self.serve_config()
+        elif path == '/api/actions':
+            self.serve_actions()
+        elif path == '/api/hotkeys':
+            self.serve_hotkeys()
+        elif path == '/api/gestures':
+            self.serve_gestures()
         else:
             self.send_error(404, "Not Found")
 
@@ -56,6 +68,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         """Handle POST requests."""
         if self.path == '/api/control':
             self.handle_control()
+        elif self.path == '/api/execute':
+            self.handle_execute_action()
+        elif self.path == '/api/gesture':
+            self.handle_gesture()
         else:
             self.send_error(404, "Not Found")
 
@@ -171,21 +187,33 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         """Serve the list of images."""
         session_id, session = self._require_session()
         if session is None:
-            self.send_error(401, "No session")
-            return
+            # Create a new session if none exists
+            session_id = str(uuid.uuid4())
+            session = self.web_slideshow.create_session(session_id)
 
         image_list = []
-        for i, idx in enumerate(session.image_order):
-            path = self.web_slideshow.image_paths[idx]
-            image_list.append({
-                'index': i,
-                'name': path.name,
-                'path': str(path)
-            })
+        # Use image_order if available, otherwise use direct indices
+        if hasattr(session, 'image_order'):
+            for i, idx in enumerate(session.image_order):
+                path = self.web_slideshow.image_paths[idx]
+                image_list.append({
+                    'index': i,
+                    'name': path.name,
+                    'path': str(path)
+                })
+        else:
+            for i, path in enumerate(self.web_slideshow.image_paths):
+                image_list.append({
+                    'index': i,
+                    'name': path.name,
+                    'path': str(path)
+                })
 
         response = {'images': image_list}
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
+        if session_id:
+            self.send_header('Set-Cookie', f'slideshow_session={session_id}; Path=/; HttpOnly')
         self.end_headers()
         self.wfile.write(json.dumps(response).encode())
 
@@ -193,30 +221,43 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         """Serve an image file."""
         session_id, session = self._require_session()
         if session is None:
-            self.send_error(401, "No session")
-            return
+            # For image serving, we can work without a session
+            session_id = None
+            session = None
+        
         try:
             sess_idx = int(path.split('/')[-1])
-            if 0 <= sess_idx < len(session.image_order):
-                real_idx = session.image_order[sess_idx]
-                image_path = self.web_slideshow.image_paths[real_idx]
-
-                if image_path.exists():
-                    mime_type, _ = mimetypes.guess_type(str(image_path))
-                    if not mime_type:
-                        mime_type = 'application/octet-stream'
-
-                    self.send_response(200)
-                    self.send_header('Content-Type', mime_type)
-                    self.send_header('Cache-Control', 'max-age=3600')
-                    self.end_headers()
-
-                    with open(image_path, 'rb') as f:
-                        self.wfile.write(f.read())
+            
+            # Get the actual image path
+            if session and hasattr(session, 'image_order'):
+                if 0 <= sess_idx < len(session.image_order):
+                    real_idx = session.image_order[sess_idx]
+                    image_path = self.web_slideshow.image_paths[real_idx]
                 else:
                     self.send_error(404, "Image not found")
+                    return
             else:
-                self.send_error(404, "Invalid image index")
+                # No session or no image_order, use direct index
+                if 0 <= sess_idx < len(self.web_slideshow.image_paths):
+                    image_path = self.web_slideshow.image_paths[sess_idx]
+                else:
+                    self.send_error(404, "Image not found")
+                    return
+            
+            if image_path.exists():
+                mime_type, _ = mimetypes.guess_type(str(image_path))
+                if not mime_type:
+                    mime_type = 'application/octet-stream'
+
+                self.send_response(200)
+                self.send_header('Content-Type', mime_type)
+                self.send_header('Cache-Control', 'max-age=3600')
+                self.end_headers()
+
+                with open(image_path, 'rb') as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_error(404, "Image not found")
         except (ValueError, IndexError):
             self.send_error(400, "Invalid request")
 
@@ -256,7 +297,9 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
             'repeat': session.repeat,
             'shuffle': session.shuffle,
             'fit_mode': session.fit_mode,
-            'always_on_top': session.always_on_top
+            'always_on_top': session.always_on_top,
+            'has_undo': session.action_history.can_undo() if hasattr(session, 'action_history') else False,
+            'has_redo': session.action_history.can_redo() if hasattr(session, 'action_history') else False
         }
 
         self.send_response(200)
@@ -265,7 +308,7 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(config).encode())
 
     def handle_control(self):
-        """Handle control commands."""
+        """Handle control commands using the action system."""
         session_id, session = self._require_session()
         if session is None:
             self.send_error(401, "No session")
@@ -281,56 +324,160 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self.send_error(400, "Invalid JSON")
             return
-        action = data.get('action')
-
-        result = {'success': False}
-
-        if action == 'next':
-            session.current_index += 1
-            if session.current_index >= len(session.image_order):
-                if session.repeat:
-                    session.current_index = 0
-                    session.repeat_count += 1
-                else:
-                    session.current_index = len(session.image_order) - 1
-            result = {'success': True, 'current_index': session.current_index}
-
-        elif action == 'previous':
-            session.current_index -= 1
-            if session.current_index < 0:
-                if session.repeat:
-                    session.current_index = len(session.image_order) - 1
-                else:
-                    session.current_index = 0
-            result = {'success': True, 'current_index': session.current_index}
-
-        elif action == 'toggle_pause':
-            session.is_paused = not session.is_paused
-            result = {'success': True, 'is_paused': session.is_paused}
-
-        elif action == 'toggle_repeat':
-            session.repeat = not session.repeat
-            result = {'success': True, 'repeat': session.repeat}
-
-        elif action == 'toggle_shuffle':
-            session.shuffle = not session.shuffle
-            if session.shuffle:
-                random.shuffle(session.image_order)
-            else:
-                session.image_order = list(range(len(self.web_slideshow.image_paths)))
-            session.current_index = 0
-            result = {'success': True, 'shuffle': session.shuffle, 'current_index': session.current_index}
-
-        elif action == 'increase_speed':
-            session.speed_seconds += 1.0
-            result = {'success': True, 'speed': session.speed_seconds}
-
-        elif action == 'decrease_speed':
-            session.speed_seconds = max(0.1, session.speed_seconds - 1.0)
-            result = {'success': True, 'speed': session.speed_seconds}
-
+        
+        action_name = data.get('action')
+        
+        # Map old action names to new action system names
+        action_map = {
+            'next': 'navigate_next',
+            'previous': 'navigate_previous',
+            'toggle_pause': 'toggle_pause',
+            'toggle_repeat': 'toggle_repeat',
+            'toggle_shuffle': 'toggle_shuffle',
+            'increase_speed': 'increase_speed',
+            'decrease_speed': 'decrease_speed',
+            'toggle_fullscreen': 'toggle_fullscreen'
+        }
+        
+        # Get the mapped action name
+        mapped_action = action_map.get(action_name, action_name)
+        
+        # Get the action from registry
+        action = action_registry.get(mapped_action)
+        
+        if action and action.can_execute('web'):
+            # Execute the action
+            try:
+                result = action.execute(session, **data.get('params', {}))
+                result['success'] = True
+            except Exception as e:
+                result = {'success': False, 'error': str(e)}
         else:
-            result = {'success': False, 'error': 'Unknown action'}
+            result = {'success': False, 'error': f'Unknown or unavailable action: {action_name}'}
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(result).encode())
+    
+    def serve_actions(self):
+        """Serve list of available actions."""
+        actions = []
+        for action in action_registry.list_actions('web'):
+            actions.append({
+                'name': action.name,
+                'description': action.description,
+                'context': action.context.value
+            })
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'actions': actions}).encode())
+    
+    def serve_hotkeys(self):
+        """Serve hotkey mappings."""
+        session_id, session = self._require_session()
+        if session is None:
+            # Create temporary hotkey manager just for info
+            hotkey_manager = HotkeyManager(self.web_slideshow.config, 'web')
+        else:
+            hotkey_manager = session.hotkey_manager if hasattr(session, 'hotkey_manager') else HotkeyManager(self.web_slideshow.config, 'web')
+        
+        mappings = hotkey_manager.get_all_mappings()
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'hotkeys': mappings}).encode())
+    
+    def serve_gestures(self):
+        """Serve gesture mappings."""
+        session_id, session = self._require_session()
+        if session is None:
+            # Create temporary gesture manager just for info
+            gesture_manager = GestureManager(self.web_slideshow.config, 'web')
+        else:
+            gesture_manager = session.gesture_manager if hasattr(session, 'gesture_manager') else GestureManager(self.web_slideshow.config, 'web')
+        
+        mappings = gesture_manager.get_all_mappings()
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'gestures': mappings}).encode())
+    
+    def handle_execute_action(self):
+        """Execute an action by name."""
+        session_id, session = self._require_session()
+        if session is None:
+            self.send_error(401, "No session")
+            return
+        
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length <= 0:
+            self.send_error(400, "No data")
+            return
+        
+        post_data = self.rfile.read(content_length)
+        try:
+            data = json.loads(post_data.decode())
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+            return
+        
+        action_name = data.get('action')
+        params = data.get('params', {})
+        
+        action = action_registry.get(action_name)
+        if action and action.can_execute('web'):
+            try:
+                result = action.execute(session, **params)
+                result['success'] = True
+            except Exception as e:
+                result = {'success': False, 'error': str(e)}
+        else:
+            result = {'success': False, 'error': f'Action not found or not available: {action_name}'}
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(result).encode())
+    
+    def handle_gesture(self):
+        """Handle gesture events."""
+        session_id, session = self._require_session()
+        if session is None:
+            self.send_error(401, "No session")
+            return
+        
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length <= 0:
+            self.send_error(400, "No data")
+            return
+        
+        post_data = self.rfile.read(content_length)
+        try:
+            data = json.loads(post_data.decode())
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+            return
+        
+        event_type = data.get('event_type')
+        touches = data.get('touches', [])
+        
+        # Get or create gesture manager for session
+        if not hasattr(session, 'gesture_manager'):
+            session.gesture_manager = GestureManager(self.web_slideshow.config, 'web')
+        
+        result = session.gesture_manager.handle_touch_event(
+            event_type, touches, session
+        )
+        
+        if result is None:
+            result = {'success': False, 'error': 'No gesture detected'}
+        else:
+            result['success'] = True
         
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
@@ -352,31 +499,60 @@ class WebSlideshow:
         """
         self.image_paths = image_paths
         self.original_image_paths = image_paths.copy()
-        self.config = config
-        self.port = port
+        self.config = config if isinstance(config, ConfigManager) else ConfigManager()
+        if isinstance(config, dict):
+            # If we got a dict, update the config manager with it
+            for key, value in config.items():
+                self.config.set(f'slideshow.{key}', value)
+        self.port = port if port else self.config.get('web.port', 8000)
         self.sessions: Dict[str, SlideshowContext] = {}  # session_id -> SlideshowContext
+        
+        # Initialize action system components
+        self._initialize_action_system()
 
         # Apply shuffle to the main list if requested
-        if config.get('shuffle', False):
+        if self.config.get('slideshow.shuffle', False):
             random.shuffle(self.image_paths)
 
         # Create handler with reference to this slideshow
         self.handler = lambda *args, **kwargs: WebSlideshowHandler(
             *args, web_slideshow=self, **kwargs
         )
+    
+    def _initialize_action_system(self):
+        """Initialize action system components."""
+        # Register external tools if configured
+        external_tools = self.config.get('external_tools.base_name', 'tool')
+        if external_tools:
+            from pathlib import Path
+            tool_manager = ExternalToolManager(external_tools, Path.cwd())
+            tool_manager.register_tool_actions(action_registry)
+        
+        # Create action history
+        history = ActionHistory(self.config.get('file_operations.max_undo_history', 50))
+        action_registry.register(UndoAction(history))
+        action_registry.register(RedoAction(history))
+        
+        # Initialize trash manager if enabled
+        if self.config.get('file_operations.enable_trash', True) and self.image_paths:
+            trash_dir = self.config.get('file_operations.trash_dir', '.trash')
+            base_path = self.image_paths[0].parent
+            self.trash_manager = TrashManager(base_path, trash_dir)
+        else:
+            self.trash_manager = None
 
     def create_session(self, session_id: str):
         """Create a new session for a client."""
         # Each session gets its own context
         session = SlideshowContext(
             image_paths=self.image_paths,  # Share the same image list
-            speed=self.config.get('speed', 3.0),
-            repeat=self.config.get('repeat', False),
-            fit_mode=self.config.get('fit_mode', 'shrink'),
-            status_format=self.config.get('status_format'),
-            always_on_top=self.config.get('always_on_top', False),
+            speed=self.config.get('slideshow.speed', 3.0),
+            repeat=self.config.get('slideshow.repeat', False),
+            fit_mode=self.config.get('slideshow.fit_mode', 'shrink'),
+            status_format=self.config.get('slideshow.status_format'),
+            always_on_top=self.config.get('slideshow.always_on_top', False),
             shuffle=False,  # prevent mutation of shared image list
-            paused=self.config.get('paused', False)
+            paused=self.config.get('slideshow.paused_on_start', False)
         )
         session.current_index = 0  # Each client starts at image 0
         # Set current_image to None as we don't load images in web mode
@@ -384,7 +560,7 @@ class WebSlideshow:
         # Per-session order (list of indices into self.image_paths)
         n = len(self.image_paths)
         session.image_order = list(range(n))
-        if self.config.get('shuffle', False):
+        if self.config.get('slideshow.shuffle', False):
             random.shuffle(session.image_order)
             session.shuffle = True
         else:

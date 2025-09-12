@@ -11,6 +11,12 @@ from pathlib import Path
 from typing import List, Optional, Dict
 
 from .core import SlideshowContext
+from .config import ConfigManager
+from .actions import action_registry, ExternalToolManager
+from .hotkeys import HotkeyManager, TkinterHotkeyAdapter
+from .gestures import GestureManager
+from .history import ActionHistory, UndoAction, RedoAction
+from .trash import TrashManager
 
 # Conditional imports - only import heavy dependencies when needed
 tk = None
@@ -44,24 +50,39 @@ def import_dependencies():
 class ImageSlideshow:
     """Main slideshow application class."""
 
-    def __init__(self, image_paths: List[Path], speed: float = 3.0, repeat: bool = False,
-                 fit_mode: str = 'shrink', status_format: Optional[str] = None,
-                 always_on_top: bool = False, shuffle: bool = False,
-                 external_tools: Optional[str] = None, paused: bool = False):
+    def __init__(self, image_paths: List[Path], config: ConfigManager = None,
+                 speed: float = None, repeat: bool = None,
+                 fit_mode: str = None, status_format: Optional[str] = None,
+                 always_on_top: bool = None, shuffle: bool = None,
+                 external_tools: Optional[str] = None, paused: bool = None):
         """
         Initialize the slideshow.
 
         Args:
             image_paths: List of image file paths to display
-            speed: Time in seconds between slides
-            repeat: Whether to loop back to beginning
-            fit_mode: How images fit in window ('shrink' or 'original')
-            status_format: Status text format with variables
-            always_on_top: Keep window above all others
-            shuffle: Randomize image order
-            external_tools: Base name for external tool scripts
-            paused: Start slideshow in paused mode
+            config: Configuration manager instance
+            speed: Time in seconds between slides (overrides config)
+            repeat: Whether to loop back to beginning (overrides config)
+            fit_mode: How images fit in window (overrides config)
+            status_format: Status text format with variables (overrides config)
+            always_on_top: Keep window above all others (overrides config)
+            shuffle: Randomize image order (overrides config)
+            external_tools: Base name for external tool scripts (overrides config)
+            paused: Start slideshow in paused mode (overrides config)
         """
+        # Store config
+        self.config = config or ConfigManager()
+        
+        # Get values from config with CLI overrides
+        speed = speed if speed is not None else self.config.get('slideshow.speed', 3.0)
+        repeat = repeat if repeat is not None else self.config.get('slideshow.repeat', False)
+        fit_mode = fit_mode if fit_mode is not None else self.config.get('slideshow.fit_mode', 'shrink')
+        status_format = status_format or self.config.get('slideshow.status_format')
+        always_on_top = always_on_top if always_on_top is not None else self.config.get('slideshow.always_on_top', False)
+        shuffle = shuffle if shuffle is not None else self.config.get('slideshow.shuffle', False)
+        paused = paused if paused is not None else self.config.get('slideshow.paused_on_start', False)
+        external_tools = external_tools or self.config.get('external_tools.base_name', 'tool')
+        
         # Create the slideshow context
         self.context = SlideshowContext(
             image_paths=image_paths,
@@ -78,10 +99,32 @@ class ImageSlideshow:
         self.is_fullscreen = False
         self.timer_id = None
 
+        # Initialize action system components
+        self.hotkey_manager = HotkeyManager(self.config, 'gui')
+        self.gesture_manager = GestureManager(self.config, 'gui')
+        self.action_history = ActionHistory(self.config.get('file_operations.max_undo_history', 50))
+        
+        # Register undo/redo actions
+        action_registry.register(UndoAction(self.action_history))
+        action_registry.register(RedoAction(self.action_history))
+        
+        # Initialize trash manager if enabled
+        if self.config.get('file_operations.enable_trash', True):
+            trash_dir = self.config.get('file_operations.trash_dir', '.trash')
+            if image_paths:
+                base_path = image_paths[0].parent
+                self.trash_manager = TrashManager(base_path, trash_dir)
+            else:
+                self.trash_manager = None
+        else:
+            self.trash_manager = None
+        
         # External tools setup
         self.external_tools = {}
         if external_tools:
-            self.external_tools = self.discover_external_tools(external_tools)
+            tool_manager = ExternalToolManager(external_tools, Path.cwd())
+            tool_manager.register_tool_actions(action_registry)
+            self.external_tools = tool_manager.tools
             if self.external_tools:
                 print(f"Found external tools for keys: {', '.join(sorted(self.external_tools.keys()))}")
 
@@ -116,33 +159,8 @@ class ImageSlideshow:
                 anchor='nw'
             )
 
-        # Bind keyboard events
-        self.root.bind('<Left>', self.previous_image)
-        self.root.bind('<Right>', self.next_image)
-        self.root.bind('<space>', self.toggle_pause)
-        self.root.bind('<Return>', self.toggle_pause)
-        self.root.bind('<Escape>', self.quit)
-        self.root.bind('q', self.quit)
-        self.root.bind('Q', self.quit)
-        self.root.bind('f', self.toggle_fullscreen)
-        self.root.bind('F', self.toggle_fullscreen)
-        self.root.bind('r', self.toggle_repeat)
-        self.root.bind('R', self.toggle_repeat)
-        self.root.bind('t', self.toggle_always_on_top)
-        self.root.bind('T', self.toggle_always_on_top)
-        self.root.bind('s', self.toggle_shuffle)
-        self.root.bind('S', self.toggle_shuffle)
-        self.root.bind('+', self.increase_speed)
-        self.root.bind('=', self.increase_speed)  # Also bind '=' for easier access (no shift needed)
-        self.root.bind('-', self.decrease_speed)
-
-        # Bind number keys for external tools
-        if self.external_tools:
-            for key in '0123456789':
-                if key in self.external_tools:
-                    self.root.bind(key, lambda e, k=key: self.execute_external_tool(k))
-                    # Also bind numpad keys
-                    self.root.bind(f'<KP_{key}>', lambda e, k=key: self.execute_external_tool(k))
+        # Bind keyboard events using hotkey manager
+        self.root.bind('<KeyPress>', self.handle_key_event)
 
         # Bind window resize event
         self.root.bind('<Configure>', self.on_resize)
@@ -167,6 +185,83 @@ class ImageSlideshow:
         except tk.TclError:
             # Fallback if state() is not available
             self.window_maximized = False
+    
+    def handle_key_event(self, event):
+        """Handle keyboard events using the hotkey manager."""
+        # Check if widgets still exist before processing
+        try:
+            if not self.canvas.winfo_exists() or not self.root.winfo_exists():
+                return
+        except (tk.TclError, AttributeError):
+            # Widget has been destroyed
+            return
+            
+        # Parse tkinter event
+        key, modifiers = TkinterHotkeyAdapter.parse_tkinter_event(event)
+        
+        # Let hotkey manager handle it and execute action
+        result = self.hotkey_manager.handle_key_event(
+            key, modifiers, self.context
+        )
+        
+        # Handle special UI-specific results
+        if result:
+            # Get the action that was executed
+            action_name = self.hotkey_manager.get_action_for_key(key, modifiers)
+            
+            # Handle UI updates based on action
+            if action_name == 'toggle_fullscreen':
+                # Handle fullscreen toggle for GUI
+                self.is_fullscreen = result.get('is_fullscreen', not self.is_fullscreen)
+                self.root.attributes('-fullscreen', self.is_fullscreen)
+                self.resize_and_display()
+            
+            elif action_name == 'toggle_always_on_top':
+                # Update window attributes
+                self.root.attributes('-topmost', self.context.always_on_top)
+                print(f"Always on top: {'on' if self.context.always_on_top else 'off'}")
+            
+            elif action_name == 'toggle_pause':
+                # Handle pause/resume timer
+                if self.context.is_paused:
+                    if self.timer_id:
+                        self.root.after_cancel(self.timer_id)
+                        self.timer_id = None
+                    print("Slideshow paused")
+                else:
+                    self.schedule_next()
+                    print("Slideshow resumed")
+            
+            elif action_name == 'toggle_repeat':
+                print(f"Repeat mode: {'on' if self.context.repeat else 'off'}")
+            
+            elif action_name == 'toggle_shuffle':
+                print(f"Shuffle mode: {'on' if self.context.shuffle else 'off'}")
+                # Shuffle updates the image list, so redisplay
+                self.display_current_image()
+            
+            elif action_name in ['increase_speed', 'decrease_speed']:
+                print(f"Speed: {self.context.speed_seconds:.1f}s per slide")
+                self.reset_timer()
+            
+            elif action_name == 'quit':
+                self.quit()
+            
+            elif action_name and action_name.startswith('external_tool_'):
+                # External tool was executed via action system
+                if result.get('action') == 'removed':
+                    print(f"Tool removed image from list")
+                    self.display_current_image()
+            
+            # Update display for navigation actions
+            if action_name in ['navigate_next', 'navigate_previous']:
+                self.reset_timer()
+                self.display_current_image()
+                if not self.context.is_paused:
+                    self.schedule_next()
+            
+            # Always update status after any action
+            self.update_status()
 
     def load_image(self, path: Path) -> Optional[object]:
         """Load an image from file with better error handling."""
@@ -199,10 +294,17 @@ class ImageSlideshow:
     def update_status(self):
         """Update the status text display."""
         if self.status_text_id:
-            status_text = self.context.format_status()
-            self.canvas.itemconfig(self.status_text_id, text=status_text)
-            # Ensure status stays on top
-            self.canvas.tag_raise(self.status_text_id)
+            try:
+                # Check if canvas still exists by trying to access its winfo
+                if not self.canvas.winfo_exists():
+                    return
+                status_text = self.context.format_status()
+                self.canvas.itemconfig(self.status_text_id, text=status_text)
+                # Ensure status stays on top
+                self.canvas.tag_raise(self.status_text_id)
+            except (tk.TclError, AttributeError):
+                # Widget has been destroyed or doesn't exist
+                pass
 
     def display_current_image(self):
         """Display the current image."""
@@ -344,27 +446,30 @@ class ImageSlideshow:
             self.resize_and_display()
 
     def next_image(self, event=None, auto_advance=False):
-        """Display next image."""
+        """Display next image - wrapper for auto-advance."""
         if not self.context.image_paths:
             return
 
-        # Only reset timer if this is a manual navigation
-        if not auto_advance:
-            self.reset_timer()
-
-        self.context.current_index += 1
-
-        if self.context.current_index >= len(self.context.image_paths):
-            if self.context.repeat:
-                self.context.current_index = 0
-                self.context.repeat_count += 1
-            else:
-                self.quit()
+        # Execute the navigate_next action
+        action = action_registry.get('navigate_next')
+        if action:
+            old_index = self.context.current_index
+            result = action.execute(self.context)
+            
+            # Check if we've reached the end
+            if old_index == result['current_index'] and not self.context.repeat:
+                # No change in index and not repeating - we're at the end
+                if auto_advance:
+                    self.quit()
                 return
-
-        self.display_current_image()
-        if not self.context.is_paused:
-            self.schedule_next()
+            
+            # Only reset timer if this is a manual navigation
+            if not auto_advance:
+                self.reset_timer()
+            
+            self.display_current_image()
+            if not self.context.is_paused:
+                self.schedule_next()
 
     def reset_timer(self):
         if self.timer_id:
@@ -372,95 +477,70 @@ class ImageSlideshow:
             self.timer_id = None
 
     def previous_image(self, event=None):
-        """Display previous image."""
+        """Display previous image - kept for compatibility."""
         if not self.context.image_paths:
             return
 
-        self.reset_timer()
-
-        self.context.current_index -= 1
-
-        if self.context.current_index < 0:
-            if self.context.repeat:
-                self.context.current_index = len(self.context.image_paths) - 1
-            else:
-                self.context.current_index = 0
-
-        self.display_current_image()
-        if not self.context.is_paused:
-            self.schedule_next()
+        # Execute the navigate_previous action
+        action = action_registry.get('navigate_previous')
+        if action:
+            action.execute(self.context)
+            self.reset_timer()
+            self.display_current_image()
+            if not self.context.is_paused:
+                self.schedule_next()
 
     def toggle_pause(self, event=None):
-        """Toggle pause/play."""
-        self.context.is_paused = not self.context.is_paused
-
-        if self.context.is_paused:
-            # Cancel scheduled advance
-            if self.timer_id:
-                self.root.after_cancel(self.timer_id)
-                self.timer_id = None
-        else:
-            # Resume auto-advance
-            self.schedule_next()
-
-        # Update status to show paused state
-        self.update_status()
+        """Toggle pause/play - kept for auto-advance handling."""
+        action = action_registry.get('toggle_pause')
+        if action:
+            action.execute(self.context)
+            
+            if self.context.is_paused:
+                # Cancel scheduled advance
+                if self.timer_id:
+                    self.root.after_cancel(self.timer_id)
+                    self.timer_id = None
+            else:
+                # Resume auto-advance
+                self.schedule_next()
+            
+            # Update status to show paused state
+            self.update_status()
 
     def toggle_fullscreen(self, event=None):
         """Toggle fullscreen mode."""
-        self.is_fullscreen = not self.is_fullscreen
-        self.root.attributes('-fullscreen', self.is_fullscreen)
-        self.resize_and_display()
+        # This is now handled in handle_key_event for proper action integration
+        pass
 
     def toggle_repeat(self, event=None):
         """Toggle repeat mode."""
-        self.context.repeat = not self.context.repeat
-        print(f"Repeat mode: {'on' if self.context.repeat else 'off'}")
-
-        # Update status to show repeat state
-        self.update_status()
+        # Now handled by action system through handle_key_event
+        pass
 
     def toggle_always_on_top(self, event=None):
         """Toggle always on top mode."""
-        self.context.always_on_top = not self.context.always_on_top
-        self.root.attributes('-topmost', self.context.always_on_top)
-        print(f"Always on top: {'on' if self.context.always_on_top else 'off'}")
-
-        # Update status if needed
-        self.update_status()
+        action = action_registry.get('toggle_always_on_top')
+        if action:
+            action.execute(self.context)
+            self.root.attributes('-topmost', self.context.always_on_top)
+            print(f"Always on top: {'on' if self.context.always_on_top else 'off'}")
+            self.update_status()
 
     def toggle_shuffle(self, event=None):
         """Toggle shuffle mode."""
-        self.context.shuffle = not self.context.shuffle
-
-        if self.context.shuffle:
-            # Shuffle the list
-            random.shuffle(self.context.image_paths)
-        else:
-            # Restore original order
-            self.context.image_paths = self.context.original_image_paths.copy()
-
-        # Reset to first image
-        self.context.current_index = 0
-        self.display_current_image()
-
-        print(f"Shuffle mode: {'on' if self.context.shuffle else 'off'}")
-
-        # Update status if needed
-        self.update_status()
+        # Now handled by action system through handle_key_event
+        pass
 
     def increase_speed(self, event=None):
-        """Increase slide speed by 1 second (slower)."""
-        self.context.speed_seconds += 1.0
-        print(f"Speed: {self.context.speed_seconds:.1f}s per slide")
-        self.update_status()
+        """Increase slide speed."""
+        # Now handled by action system through handle_key_event
+        pass
 
     def decrease_speed(self, event=None):
-        """Decrease slide speed by 1 second (faster), minimum 0.1s."""
-        if self.context.speed_seconds > 0.1:
-            self.context.speed_seconds = max(0.1, self.context.speed_seconds - 1.0)
-            print(f"Speed: {self.context.speed_seconds:.1f}s per slide")
-            self.update_status()
+        """Decrease slide speed."""
+        # Now handled by action system through handle_key_event
+        pass
 
     def schedule_next(self):
         """Schedule next image advance."""
@@ -498,35 +578,8 @@ class ImageSlideshow:
         """Start the slideshow."""
         self.root.mainloop()
 
-    def discover_external_tools(self, base_name: str) -> Dict[str, Path]:
-        """
-        Discover external tool scripts in the current directory.
-
-        Args:
-            base_name: Base name for scripts (e.g., 'rename_tool')
-
-        Returns:
-            Dictionary mapping keys '0'-'9' to script paths
-        """
-        tools = {}
-        current_dir = Path.cwd()
-
-        # Look for scripts matching pattern base_name[0-9].*
-        for key in '0123456789':
-            # Try common script extensions
-            for pattern in [f'{base_name}{key}', f'{base_name}{key}.*']:
-                matches = list(current_dir.glob(pattern))
-                for match in matches:
-                    if match.is_file() and not match.is_dir():
-                        # Check if it's executable or has a known script extension
-                        if (match.suffix in ['.sh', '.py', '.bat', '.cmd', '.exe', '.ps1'] or
-                            os.access(match, os.X_OK)):
-                            tools[key] = match
-                            break
-                if key in tools:
-                    break
-
-        return tools
+    # External tool discovery is now handled by ExternalToolManager in __init__
+    # Tools are registered as actions and executed through the action system
 
     def execute_external_tool(self, key: str):
         """

@@ -15,9 +15,10 @@ from .core import (
     get_status_template,
     collect_images_from_paths
 )
+from .config import ConfigManager
 
 
-def parse_arguments():
+def parse_arguments(args=None):
     """Parse command line arguments."""
     # Build status line presets for epilog dynamically from STATUS_PRESETS
     status_presets_lines = []
@@ -60,9 +61,10 @@ Template variables:
         '''
     )
 
+    # Make paths optional if --generate-config is used
     parser.add_argument(
         'paths',
-        nargs='+',
+        nargs='*',  # Changed from '+' to '*' to make it optional
         help='One or more image folder paths or @response_file'
     )
 
@@ -156,14 +158,47 @@ Template variables:
              f'environment variables: {qss_vars}. Return code 0: no action, '
              f'1: remove image from list.'
     )
+    
+    parser.add_argument(
+        '--generate-config',
+        action='store_true',
+        help='Generate a default config file in current directory and exit'
+    )
+    
+    parser.add_argument(
+        '--config',
+        metavar='PATH',
+        help='Path to configuration file (default: search for qslideshow.yaml)'
+    )
 
-    return parser.parse_args()
+    return parser.parse_args(args)
 
 
 def main():
     """Main entry point."""
     # Parse arguments first
     args = parse_arguments()
+    
+    # Initialize configuration manager
+    config_manager = ConfigManager()
+    
+    # Handle --generate-config option
+    if args.generate_config:
+        path = config_manager.generate_default_config_file()
+        print(f"Generated default config file: {path}")
+        sys.exit(0)
+    
+    # Load config from file if specified or find default
+    config_path = getattr(args, 'config', None)
+    config_manager.load_config(config_path)
+    
+    # Update config with command-line arguments (CLI overrides config file)
+    config_manager.update_from_args(args)
+    
+    # Paths are required if not generating config
+    if not args.paths:
+        print("Error: No image paths provided. Use --help for usage information.")
+        sys.exit(1)
 
     # Parse exclude patterns
     exclude_patterns = []
@@ -196,20 +231,14 @@ def main():
         # Run as web server
         from .webserver import WebSlideshow
         
-        config = {
-            'speed': args.speed,
-            'repeat': args.repeat,
-            'fit_mode': args.fit_mode,
-            'status_format': status_format,
-            'always_on_top': args.always_on_top,
-            'shuffle': args.shuffle,
-            'paused': args.paused,
-            'web_dev': getattr(args, 'web_dev', False)
-        }
-
+        # Update config with status format
+        if status_format:
+            config_manager.set('slideshow.status_format', status_format)
+        
+        # Pass the config manager which has both file config and CLI overrides
         web_slideshow = WebSlideshow(
             image_files,
-            config=config,
+            config=config_manager,
             port=args.port
         )
         
@@ -228,17 +257,22 @@ def main():
         # Import dependencies after argument parsing and only when needed
         import_dependencies()
 
-        # Create and run slideshow
+        # Update config with status format
+        if status_format:
+            config_manager.set('slideshow.status_format', status_format)
+        
+        # Create and run slideshow with config manager
         slideshow = ImageSlideshow(
             image_files,
-            speed=args.speed,
-            repeat=args.repeat,
-            fit_mode=args.fit_mode,
+            config=config_manager,
+            speed=args.speed if hasattr(args, 'speed') else None,
+            repeat=args.repeat if hasattr(args, 'repeat') else None,
+            fit_mode=args.fit_mode if hasattr(args, 'fit_mode') else None,
             status_format=status_format,
-            always_on_top=args.always_on_top,
-            shuffle=args.shuffle,
-            external_tools=args.external_tools,
-            paused=args.paused
+            always_on_top=args.always_on_top if hasattr(args, 'always_on_top') else None,
+            shuffle=args.shuffle if hasattr(args, 'shuffle') else None,
+            external_tools=args.external_tools if hasattr(args, 'external_tools') else None,
+            paused=args.paused if hasattr(args, 'paused') else None
         )
 
         try:

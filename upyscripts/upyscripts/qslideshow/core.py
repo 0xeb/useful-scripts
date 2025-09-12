@@ -163,6 +163,30 @@ class SlideshowContext:
             variables['progress_percent'] = "0"
 
         return variables
+    
+    def get_environment_variables(self, prefix: str = "QSS_") -> Dict[str, str]:
+        """
+        Get environment variables from template variables.
+        
+        Automatically:
+        - Adds the specified prefix (default QSS_)
+        - Converts keys to uppercase
+        - Converts all values to strings
+        
+        Args:
+            prefix: Prefix to add to environment variable names
+            
+        Returns:
+            Dictionary of environment variable names to values
+        """
+        template_vars = self.get_template_variables()
+        env_vars = {}
+        
+        for key, value in template_vars.items():
+            env_key = f"{prefix}{key.upper()}"
+            env_vars[env_key] = str(value)
+        
+        return env_vars
 
     def format_template(self, template: str) -> str:
         """Format a template string with current variable values."""
