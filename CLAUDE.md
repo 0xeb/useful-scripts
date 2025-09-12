@@ -19,6 +19,7 @@ This installs the following command-line tools with `upy.` prefix:
 - `upy.asm_emit` - Convert binary to Visual C++ __asm __emit statements
 - `upy.dll2proj` - Convert DLL to Visual Studio project with function stubs (requires pefile)
 - `upy.file_upload` - File upload utility
+- `upy.ghview` - GitHub-style local repository browser with syntax highlighting
 - `upy.html_entities` - Escape HTML entities
 - `upy.jsonutils` - JSON utility tool (beautify, minify, validate, tree view, query)
 - `upy.markdown_render` - Render Markdown to HTML on localhost
@@ -111,9 +112,10 @@ The `upyscripts` package uses setuptools with `pyproject.toml` configuration. Al
 - The qslideshow tool has a complex architecture with GUI (tkinter), web server (Flask), and PWA components
 
 ### Key Technical Details
-- Python dependencies: markdown2, flask, werkzeug, Pillow, PyMuPDF, requests, pefile, astral, matplotlib, pandas, numpy, pytz, tzlocal
+- Python dependencies: markdown2, markdown, pygments, flask, werkzeug, Pillow, PyMuPDF, requests, pefile, astral, matplotlib, pandas, numpy, pytz, tzlocal
 - The C projects require Windows/MSVC and use low-level system programming techniques
 - The dll2proj tool (now integrated as upy.dll2proj) requires Windows and the pefile library
 - The eval_cpp tool generates and compiles C++ code dynamically using CMake
 - The qslideshow web interface is a Progressive Web App with offline support
+- The ghview tool provides a GitHub-like web interface for browsing local repositories with full syntax highlighting
 - All Python tools are Python 3.7+ compatible

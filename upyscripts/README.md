@@ -155,6 +155,27 @@ upy.preprocess document.txt --normalize-whitespace
 upy.preprocess *.py --remove-empty-lines
 ```
 
+### ghview.py
+GitHub-style local repository browser for viewing any folder with a web interface similar to GitHub.
+
+Features:
+- Directory listing with README rendering
+- Syntax-highlighted source code viewing with Pygments
+- Markdown file rendering with GitHub-like styles
+- Image and asset serving
+- Safe path handling with symlink protection
+
+```bash
+# Serve current directory
+upy.ghview
+
+# Serve specific directory on custom port
+upy.ghview /path/to/repo --port 8080
+
+# Browse local git repository
+upy.ghview ~/projects/myproject --port 3000
+```
+
 ### pyast.py
 Python AST analyzer that extracts and displays:
 - Global functions and their signatures

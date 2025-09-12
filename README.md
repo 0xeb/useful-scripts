@@ -20,6 +20,7 @@ This installs command-line tools with the `upy.` prefix:
 - `upy.asm_emit` - Convert binary to Visual C++ __asm __emit statements  
 - `upy.dll2proj` - Convert DLL to Visual Studio project with function stubs
 - `upy.file_upload` - File upload utility
+- `upy.ghview` - GitHub-style local repository browser with syntax highlighting
 - `upy.html_entities` - Escape HTML entities
 - `upy.jsonutils` - JSON utility tool (beautify, minify, validate, tree view, query)
 - `upy.markdown_render` - Render Markdown to HTML on localhost
