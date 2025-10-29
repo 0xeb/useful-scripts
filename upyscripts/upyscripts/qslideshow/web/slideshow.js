@@ -10,16 +10,44 @@ class WebSlideshow {
         this.shuffle = false;
         this.wakeLock = null;
         this.wakeLockReacquireInterval = null;
-        this.isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                           window.navigator.standalone || 
+        this.isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                           window.navigator.standalone ||
                            document.referrer.includes('android-app://');
-        
+
+        // Generate unique session ID for this tab/window
+        this.sessionId = this.generateSessionId();
+        console.log('Session ID:', this.sessionId);
+
         // Action system data
         this.hotkeys = {};
         this.gestures = {};
         this.actions = [];
-        
+
         this.init();
+    }
+
+    generateSessionId() {
+        // Use crypto.randomUUID() if available, otherwise fallback
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        // Fallback for older browsers
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    getRequestOptions(options = {}) {
+        // Add session ID header to all requests
+        const headers = options.headers || {};
+        headers['X-Session-ID'] = this.sessionId;
+        return {
+            ...options,
+            credentials: 'include',
+            headers: headers
+        };
     }
     
     async init() {
@@ -39,7 +67,7 @@ class WebSlideshow {
     
     async loadImages() {
         try {
-            const response = await fetch('/api/images', { credentials: 'include' });
+            const response = await fetch('/api/images', this.getRequestOptions());
             const data = await response.json();
             this.images = data.images;
             console.log(`Loaded ${this.images.length} images`);
@@ -47,10 +75,10 @@ class WebSlideshow {
             console.error('Failed to load images:', error);
         }
     }
-    
+
     async loadConfig() {
         try {
-            const response = await fetch('/api/config', { credentials: 'include' });
+            const response = await fetch('/api/config', this.getRequestOptions());
             this.config = await response.json();
             this.speedSeconds = this.config.speed || 3.0;
             this.repeat = this.config.repeat || false;
@@ -59,10 +87,10 @@ class WebSlideshow {
             console.error('Failed to load config:', error);
         }
     }
-    
+
     async loadHotkeys() {
         try {
-            const response = await fetch('/api/hotkeys', { credentials: 'include' });
+            const response = await fetch('/api/hotkeys', this.getRequestOptions());
             const data = await response.json();
             this.hotkeys = data.hotkeys || {};
             console.log('Loaded hotkey mappings:', this.hotkeys);
@@ -70,10 +98,10 @@ class WebSlideshow {
             console.error('Failed to load hotkeys:', error);
         }
     }
-    
+
     async loadGestures() {
         try {
-            const response = await fetch('/api/gestures', { credentials: 'include' });
+            const response = await fetch('/api/gestures', this.getRequestOptions());
             const data = await response.json();
             this.gestures = data.gestures || {};
             console.log('Loaded gesture mappings:', this.gestures);
@@ -84,7 +112,7 @@ class WebSlideshow {
     
     async loadActions() {
         try {
-            const response = await fetch('/api/actions', { credentials: 'include' });
+            const response = await fetch('/api/actions', this.getRequestOptions());
             const data = await response.json();
             this.actions = data.actions || [];
             console.log(`Loaded ${this.actions.length} actions`);
@@ -189,15 +217,14 @@ class WebSlideshow {
     
     async sendGesture(eventType, touches) {
         try {
-            const response = await fetch('/api/gesture', {
+            const response = await fetch('/api/gesture', this.getRequestOptions({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
                 body: JSON.stringify({
                     event_type: eventType,
                     touches: touches
                 })
-            });
+            }));
             const result = await response.json();
             if (result.success) {
                 this.handleActionResult(result);
@@ -216,15 +243,14 @@ class WebSlideshow {
     
     async executeAction(actionName, params = {}) {
         try {
-            const response = await fetch('/api/execute', {
+            const response = await fetch('/api/execute', this.getRequestOptions({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
                 body: JSON.stringify({
                     action: actionName,
                     params: params
                 })
-            });
+            }));
             const result = await response.json();
             if (result.success) {
                 this.handleActionResult(result);
@@ -557,7 +583,7 @@ class WebSlideshow {
     async startStatusPolling() {
         setInterval(async () => {
             try {
-                const response = await fetch('/api/status', { credentials: 'include' });
+                const response = await fetch('/api/status', this.getRequestOptions());
                 const status = await response.json();
                 
                 if (status.current_index !== this.currentIndex) {

@@ -9,7 +9,7 @@ import mimetypes
 import uuid
 import random
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 
 from .core import SlideshowContext
@@ -40,6 +40,9 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         # Serve main HTML file
         if path in ('/', '/index.html'):
             self.serve_html()
+        # Serve login page
+        elif path == '/login.html':
+            self.serve_login()
         # Serve JavaScript file
         elif path == '/slideshow.js':
             self.serve_javascript()
@@ -66,7 +69,9 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Handle POST requests."""
-        if self.path == '/api/control':
+        if self.path == '/api/authenticate':
+            self.handle_authenticate()
+        elif self.path == '/api/control':
             self.handle_control()
         elif self.path == '/api/execute':
             self.handle_execute_action()
@@ -75,29 +80,56 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
-    def get_session_id(self):
-        """Get or create session ID from cookies."""
+    def get_auth_session_id(self):
+        """Get authentication session ID from cookie (shared across tabs)."""
         cookie_header = self.headers.get('Cookie', '')
-        session_id = None
+        auth_session_id = None
 
         if cookie_header:
             for cookie in cookie_header.split(';'):
                 if '=' in cookie:
                     name, value = cookie.strip().split('=', 1)
-                    if name == 'slideshow_session':
-                        session_id = value
+                    if name == 'auth_session':
+                        auth_session_id = value
                         break
 
-        return session_id
+        return auth_session_id
+
+    def get_slideshow_session_id(self):
+        """Get slideshow session ID from header (unique per tab)."""
+        return self.headers.get('X-Session-ID')
 
     def _require_session(self):
-        session_id = self.get_session_id()
-        if not session_id or session_id not in self.web_slideshow.sessions:
+        """Get slideshow session. Creates new session if header provides an ID."""
+        session_id = self.get_slideshow_session_id()
+        if not session_id:
             return None, None
+
+        # Create session if it doesn't exist
+        if session_id not in self.web_slideshow.sessions:
+            self.web_slideshow.create_session(session_id)
+
         return session_id, self.web_slideshow.sessions[session_id]
+
+    def _check_authentication(self):
+        """Check if the auth session is authenticated. Returns True if no password or authenticated."""
+        # If no password is set, always allow access
+        if not self.web_slideshow.password:
+            return True
+
+        # Check if auth session is authenticated
+        auth_session_id = self.get_auth_session_id()
+        return auth_session_id in self.web_slideshow.authenticated_sessions
 
     def serve_html(self):
         """Serve the main HTML page."""
+        # Check authentication if password is set
+        if not self._check_authentication():
+            self.send_response(302)
+            self.send_header('Location', '/login.html')
+            self.end_headers()
+            return
+
         # Try to load external HTML file first
         html_file = Path(__file__).parent / 'web' / 'index.html'
 
@@ -108,15 +140,9 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         with open(html_file, 'r', encoding='utf-8') as f:
             html_content = f.read()
 
-        # Create or get session
-        session_id = self.get_session_id()
-        if not session_id or session_id not in self.web_slideshow.sessions:
-            session_id = str(uuid.uuid4())
-            self.web_slideshow.create_session(session_id)
-
+        # No need to create session here - client will send session ID via header
         self.send_response(200)
         self.send_header('Content-Type', 'text/html')
-        self.send_header('Set-Cookie', f'slideshow_session={session_id}; Path=/; HttpOnly')
         
         # Add cache-busting headers in development mode
         if self.web_slideshow.config.get('web_dev', False):
@@ -124,6 +150,29 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
             self.send_header('Pragma', 'no-cache')
             self.send_header('Expires', '0')
         
+        self.end_headers()
+        self.wfile.write(html_content.encode())
+
+    def serve_login(self):
+        """Serve the login page."""
+        login_file = Path(__file__).parent / 'web' / 'login.html'
+
+        if not login_file.exists():
+            self.send_error(500, "Server misconfiguration: login.html not found")
+            return
+
+        with open(login_file, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html')
+
+        # Add cache-busting headers in development mode
+        if self.web_slideshow.config.get('web_dev', False):
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+
         self.end_headers()
         self.wfile.write(html_content.encode())
 
@@ -185,11 +234,14 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
 
     def serve_image_list(self):
         """Serve the list of images."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         session_id, session = self._require_session()
         if session is None:
-            # Create a new session if none exists
-            session_id = str(uuid.uuid4())
-            session = self.web_slideshow.create_session(session_id)
+            self.send_error(400, "Missing session ID header")
+            return
 
         image_list = []
         # Use image_order if available, otherwise use direct indices
@@ -212,13 +264,15 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         response = {'images': image_list}
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
-        if session_id:
-            self.send_header('Set-Cookie', f'slideshow_session={session_id}; Path=/; HttpOnly')
         self.end_headers()
         self.wfile.write(json.dumps(response).encode())
 
     def serve_image(self, path):
         """Serve an image file."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         session_id, session = self._require_session()
         if session is None:
             # For image serving, we can work without a session
@@ -263,6 +317,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
 
     def serve_status(self):
         """Serve current status for this session."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         session_id, session = self._require_session()
         if session is None:
             self.send_error(401, "No session")
@@ -287,6 +345,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
 
     def serve_config(self):
         """Serve configuration."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         session_id, session = self._require_session()
         if session is None:
             self.send_error(401, "No session")
@@ -307,8 +369,54 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(config).encode())
 
+    def handle_authenticate(self):
+        """Handle password authentication."""
+        # Read password from POST data
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length <= 0:
+            self.send_error(400, "No data")
+            return
+
+        post_data = self.rfile.read(content_length)
+        try:
+            data = json.loads(post_data.decode())
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+            return
+
+        password = data.get('password', '')
+
+        # Check if password matches
+        if self.web_slideshow.password and password == self.web_slideshow.password:
+            # Get or create auth session
+            auth_session_id = self.get_auth_session_id()
+            if not auth_session_id:
+                auth_session_id = str(uuid.uuid4())
+
+            # Mark auth session as authenticated
+            self.web_slideshow.authenticated_sessions.add(auth_session_id)
+
+            # Return success with auth cookie
+            response = {'success': True}
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Set-Cookie', f'auth_session={auth_session_id}; Path=/; HttpOnly')
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+        else:
+            # Return error
+            response = {'success': False, 'error': 'Invalid password'}
+            self.send_response(401)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+
     def handle_control(self):
         """Handle control commands using the action system."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         session_id, session = self._require_session()
         if session is None:
             self.send_error(401, "No session")
@@ -362,6 +470,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
     
     def serve_actions(self):
         """Serve list of available actions."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         actions = []
         for action in action_registry.list_actions('web'):
             actions.append({
@@ -377,6 +489,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
     
     def serve_hotkeys(self):
         """Serve hotkey mappings."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         session_id, session = self._require_session()
         if session is None:
             # Create temporary hotkey manager just for info
@@ -393,6 +509,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
     
     def serve_gestures(self):
         """Serve gesture mappings."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         session_id, session = self._require_session()
         if session is None:
             # Create temporary gesture manager just for info
@@ -409,6 +529,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
     
     def handle_execute_action(self):
         """Execute an action by name."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         session_id, session = self._require_session()
         if session is None:
             self.send_error(401, "No session")
@@ -446,6 +570,10 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
     
     def handle_gesture(self):
         """Handle gesture events."""
+        if not self._check_authentication():
+            self.send_error(401, "Unauthorized")
+            return
+
         session_id, session = self._require_session()
         if session is None:
             self.send_error(401, "No session")
@@ -488,7 +616,7 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
 class WebSlideshow:
     """Web-based slideshow server."""
 
-    def __init__(self, image_paths: List[Path], config: Dict[str, Any], port: int = 8000):
+    def __init__(self, image_paths: List[Path], config: Dict[str, Any], port: int = 8000, password: Optional[str] = None):
         """
         Initialize web slideshow server.
 
@@ -496,6 +624,7 @@ class WebSlideshow:
             image_paths: List of image paths to serve
             config: Configuration dictionary
             port: Port to run server on
+            password: Optional password for web authentication
         """
         self.image_paths = image_paths
         self.original_image_paths = image_paths.copy()
@@ -505,7 +634,9 @@ class WebSlideshow:
             for key, value in config.items():
                 self.config.set(f'slideshow.{key}', value)
         self.port = port if port else self.config.get('web.port', 8000)
-        self.sessions: Dict[str, SlideshowContext] = {}  # session_id -> SlideshowContext
+        self.password = password  # Optional password for authentication
+        self.sessions: Dict[str, SlideshowContext] = {}  # slideshow_session_id -> SlideshowContext
+        self.authenticated_sessions: set = set()  # Set of authenticated auth_session_ids
         
         # Initialize action system components
         self._initialize_action_system()

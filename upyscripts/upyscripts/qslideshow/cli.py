@@ -141,6 +141,13 @@ Template variables:
     )
 
     parser.add_argument(
+        '--web-password',
+        type=str,
+        metavar='PASSWORD',
+        help='Optional password for web server access (enables authentication)'
+    )
+
+    parser.add_argument(
         '--web-dev',
         action='store_true',
         help='Development mode: disable browser caching for live editing of web files'
@@ -239,7 +246,8 @@ def main():
         web_slideshow = WebSlideshow(
             image_files,
             config=config_manager,
-            port=args.port
+            port=args.port,
+            password=args.web_password if hasattr(args, 'web_password') else None
         )
         
         if args.web_dev:
