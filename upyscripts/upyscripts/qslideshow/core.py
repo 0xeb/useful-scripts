@@ -89,6 +89,7 @@ class SlideshowContext:
         # Runtime state
         self.is_paused = paused
         self.repeat_count = 0
+        self.authenticated = False  # Web mode authentication state
 
         # Apply shuffle if requested
         if self.shuffle:
