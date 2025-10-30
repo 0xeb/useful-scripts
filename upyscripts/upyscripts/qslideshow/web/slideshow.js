@@ -285,6 +285,11 @@ class WebSlideshow {
             this.repeat = result.repeat;
             console.log('Repeat:', this.repeat ? 'on' : 'off');
             this.updateStatus();
+            // Reset timer when repeat mode changes
+            if (!this.isPaused) {
+                this.resetTimer();
+                this.startAutoAdvance();
+            }
         }
         
         if ('shuffle' in result) {
@@ -295,12 +300,22 @@ class WebSlideshow {
             }
             console.log('Shuffle:', this.shuffle ? 'on' : 'off');
             this.updateStatus();
+            // Reset timer when shuffle mode changes
+            if (!this.isPaused) {
+                this.resetTimer();
+                this.startAutoAdvance();
+            }
         }
         
         if ('speed' in result) {
             this.speedSeconds = result.speed;
             console.log(`Speed: ${this.speedSeconds}s`);
             this.updateStatus();
+            // Reset timer to apply new speed immediately
+            if (!this.isPaused) {
+                this.resetTimer();
+                this.startAutoAdvance();
+            }
         }
         
         if ('is_fullscreen' in result && result.action === 'toggle_fullscreen') {
