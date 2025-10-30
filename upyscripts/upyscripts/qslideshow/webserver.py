@@ -692,6 +692,8 @@ class WebSlideshow:
         n = len(self.image_paths)
         session.image_order = list(range(n))
         if self.config.get('slideshow.shuffle', False):
+            # Each session gets a fresh shuffle using the global random state
+            # The global random module maintains good entropy across calls
             random.shuffle(session.image_order)
             session.shuffle = True
         else:

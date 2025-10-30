@@ -74,32 +74,44 @@ action_registry = ActionRegistry()
 # Navigation Actions
 class NavigateNextAction(Action):
     """Navigate to the next image in the slideshow."""
-    
+
     def __init__(self):
         super().__init__("navigate_next", "Go to next image", ActionContext.BOTH)
-    
+
     def execute(self, slideshow_context: SlideshowContext, **kwargs) -> Dict[str, Any]:
         slideshow_context.current_index += 1
-        if slideshow_context.current_index >= len(slideshow_context.image_paths):
+
+        # Use image_order length if available (web mode), otherwise image_paths
+        total_images = (len(slideshow_context.image_order)
+                       if hasattr(slideshow_context, 'image_order')
+                       else len(slideshow_context.image_paths))
+
+        if slideshow_context.current_index >= total_images:
             if slideshow_context.repeat:
                 slideshow_context.current_index = 0
                 slideshow_context.repeat_count += 1
             else:
-                slideshow_context.current_index = len(slideshow_context.image_paths) - 1
+                slideshow_context.current_index = total_images - 1
         return {"current_index": slideshow_context.current_index}
 
 
 class NavigatePreviousAction(Action):
     """Navigate to the previous image in the slideshow."""
-    
+
     def __init__(self):
         super().__init__("navigate_previous", "Go to previous image", ActionContext.BOTH)
-    
+
     def execute(self, slideshow_context: SlideshowContext, **kwargs) -> Dict[str, Any]:
         slideshow_context.current_index -= 1
+
+        # Use image_order length if available (web mode), otherwise image_paths
+        total_images = (len(slideshow_context.image_order)
+                       if hasattr(slideshow_context, 'image_order')
+                       else len(slideshow_context.image_paths))
+
         if slideshow_context.current_index < 0:
             if slideshow_context.repeat:
-                slideshow_context.current_index = len(slideshow_context.image_paths) - 1
+                slideshow_context.current_index = total_images - 1
             else:
                 slideshow_context.current_index = 0
         return {"current_index": slideshow_context.current_index}
@@ -144,18 +156,59 @@ class ToggleRepeatAction(Action):
 
 class ToggleShuffleAction(Action):
     """Toggle shuffle mode for the slideshow."""
-    
+
     def __init__(self):
         super().__init__("toggle_shuffle", "Toggle shuffle mode", ActionContext.BOTH)
-    
+
     def execute(self, slideshow_context: SlideshowContext, **kwargs) -> Dict[str, Any]:
         import random
         slideshow_context.shuffle = not slideshow_context.shuffle
-        if slideshow_context.shuffle:
-            random.shuffle(slideshow_context.image_paths)
+
+        # Check if we're in web mode (has image_order attribute)
+        if hasattr(slideshow_context, 'image_order'):
+            # Web mode: work with image_order, not image_paths
+            if slideshow_context.shuffle:
+                # Remember current image by getting its actual index
+                if slideshow_context.current_index < len(slideshow_context.image_order):
+                    current_real_idx = slideshow_context.image_order[slideshow_context.current_index]
+                else:
+                    current_real_idx = None
+
+                # Shuffle the order using global random state
+                random.shuffle(slideshow_context.image_order)
+
+                # Find where the current image ended up
+                if current_real_idx is not None:
+                    try:
+                        slideshow_context.current_index = slideshow_context.image_order.index(current_real_idx)
+                    except ValueError:
+                        slideshow_context.current_index = 0
+                else:
+                    slideshow_context.current_index = 0
+            else:
+                # Turn off shuffle: reset to sequential order
+                if slideshow_context.current_index < len(slideshow_context.image_order):
+                    current_real_idx = slideshow_context.image_order[slideshow_context.current_index]
+                else:
+                    current_real_idx = 0
+
+                # Reset to sequential
+                slideshow_context.image_order = list(range(len(slideshow_context.image_paths)))
+
+                # Current index is now the real index
+                slideshow_context.current_index = current_real_idx
+
+            return {
+                "shuffle": slideshow_context.shuffle,
+                "current_index": slideshow_context.current_index
+            }
         else:
-            slideshow_context.image_paths = slideshow_context.original_image_paths.copy()
-        return {"shuffle": slideshow_context.shuffle}
+            # GUI mode: work with image_paths directly
+            if slideshow_context.shuffle:
+                random.shuffle(slideshow_context.image_paths)
+            else:
+                slideshow_context.image_paths = slideshow_context.original_image_paths.copy()
+            return {"shuffle": slideshow_context.shuffle}
 
 
 class ToggleAlwaysOnTopAction(Action):
