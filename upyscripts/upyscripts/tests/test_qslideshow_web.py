@@ -410,3 +410,155 @@ class TestHTMLPages:
         r = requests.get(f"{base_url}/login.html")
         assert r.status_code == 200
         assert "text/html" in r.headers.get("Content-Type", "")
+
+
+class TestShuffleMode:
+    """Test shuffle functionality."""
+
+    @pytest.fixture
+    def web_server_shuffle(self, test_images):
+        """Start web server with shuffle enabled."""
+        config = ConfigManager()
+        config.set('slideshow.shuffle', True)
+        port = find_free_port()
+        server = WebSlideshow(test_images, config=config, port=port)
+
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
+        time.sleep(0.5)
+
+        yield server
+
+    def test_shuffle_enabled_on_startup(self, web_server_shuffle):
+        """Test that shuffle is enabled when configured."""
+        base_url = f"http://localhost:{web_server_shuffle.port}"
+
+        # Create a session and check shuffle status
+        r = requests.get(
+            f"{base_url}/api/status",
+            headers={"X-Session-ID": "test"}
+        )
+        assert r.status_code == 200
+        assert r.json()["shuffle"] == True
+
+    def test_different_sessions_get_different_shuffle_orders(self, web_server_shuffle):
+        """Test that each session gets its own shuffle order."""
+        base_url = f"http://localhost:{web_server_shuffle.port}"
+
+        # Get image lists for three different sessions
+        r1 = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "s1"})
+        r2 = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "s2"})
+        r3 = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "s3"})
+
+        images1 = [img["name"] for img in r1.json()["images"]]
+        images2 = [img["name"] for img in r2.json()["images"]]
+        images3 = [img["name"] for img in r3.json()["images"]]
+
+        # All should have same images (just different order)
+        assert set(images1) == set(images2) == set(images3)
+
+        # At least one should have a different order (highly likely with shuffle)
+        # Note: there's a small chance all three get the same random order
+        orders_match = (images1 == images2 and images2 == images3)
+        assert not orders_match, "All three sessions got identical shuffle order (very unlikely)"
+
+    def test_toggle_shuffle_on(self, web_server):
+        """Test toggling shuffle on from off state."""
+        base_url = f"http://localhost:{web_server.port}"
+
+        # Get initial image order (sequential)
+        r = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "test"})
+        initial_images = [img["name"] for img in r.json()["images"]]
+
+        # Toggle shuffle on
+        r = requests.post(
+            f"{base_url}/api/execute",
+            json={"action": "toggle_shuffle"},
+            headers={"X-Session-ID": "test"}
+        )
+        assert r.status_code == 200
+        assert r.json()["shuffle"] == True
+
+        # Get new image order
+        r = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "test"})
+        shuffled_images = [img["name"] for img in r.json()["images"]]
+
+        # Should have same images, likely different order
+        assert set(initial_images) == set(shuffled_images)
+
+    def test_toggle_shuffle_off_uses_server_order(self, web_server_shuffle):
+        """Test toggling shuffle off gives sequential indices into server's image list."""
+        base_url = f"http://localhost:{web_server_shuffle.port}"
+
+        # Session 1: Get shuffled order
+        r1 = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "s1"})
+        s1_shuffled = [img["name"] for img in r1.json()["images"]]
+
+        # Session 2: Get its own different shuffled order
+        r2 = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "s2"})
+        s2_shuffled = [img["name"] for img in r2.json()["images"]]
+
+        # They should be different (with high probability)
+        assert s1_shuffled != s2_shuffled, "Sessions should have different shuffle orders"
+
+        # Toggle shuffle off in session 1
+        r = requests.post(
+            f"{base_url}/api/execute",
+            json={"action": "toggle_shuffle"},
+            headers={"X-Session-ID": "s1"}
+        )
+        assert r.status_code == 200
+        assert r.json()["shuffle"] == False
+
+        # Toggle shuffle off in session 2
+        r = requests.post(
+            f"{base_url}/api/execute",
+            json={"action": "toggle_shuffle"},
+            headers={"X-Session-ID": "s2"}
+        )
+        assert r.status_code == 200
+        assert r.json()["shuffle"] == False
+
+        # Now both should have the same order (sequential indices into server's list)
+        r1 = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "s1"})
+        r2 = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "s2"})
+
+        s1_sequential = [img["name"] for img in r1.json()["images"]]
+        s2_sequential = [img["name"] for img in r2.json()["images"]]
+
+        # Both should now have identical order
+        assert s1_sequential == s2_sequential
+
+    def test_shuffle_preserves_current_image(self, web_server):
+        """Test that toggling shuffle keeps you on the current image."""
+        base_url = f"http://localhost:{web_server.port}"
+
+        # Navigate to image 1
+        requests.post(
+            f"{base_url}/api/execute",
+            json={"action": "navigate_next"},
+            headers={"X-Session-ID": "test"}
+        )
+
+        # Get current image name
+        r = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "test"})
+        images = r.json()["images"]
+        r = requests.get(f"{base_url}/api/status", headers={"X-Session-ID": "test"})
+        current_idx = r.json()["current_index"]
+        current_image_name = images[current_idx]["name"]
+
+        # Toggle shuffle on
+        requests.post(
+            f"{base_url}/api/execute",
+            json={"action": "toggle_shuffle"},
+            headers={"X-Session-ID": "test"}
+        )
+
+        # Check we're still viewing the same image
+        r = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "test"})
+        new_images = r.json()["images"]
+        r = requests.get(f"{base_url}/api/status", headers={"X-Session-ID": "test"})
+        new_current_idx = r.json()["current_index"]
+        new_current_image_name = new_images[new_current_idx]["name"]
+
+        assert current_image_name == new_current_image_name
