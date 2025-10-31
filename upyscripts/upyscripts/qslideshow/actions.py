@@ -213,13 +213,37 @@ class ToggleShuffleAction(Action):
 
 class ToggleAlwaysOnTopAction(Action):
     """Toggle always-on-top window mode."""
-    
+
     def __init__(self):
         super().__init__("toggle_always_on_top", "Toggle window always on top", ActionContext.GUI)
-    
+
     def execute(self, slideshow_context: SlideshowContext, **kwargs) -> Dict[str, Any]:
         slideshow_context.always_on_top = not slideshow_context.always_on_top
         return {"always_on_top": slideshow_context.always_on_top}
+
+
+class ToggleGalleryModeAction(Action):
+    """Toggle between gallery and slideshow views (web mode only)."""
+
+    def __init__(self):
+        super().__init__("toggle_gallery_mode", "Toggle gallery/slideshow view", ActionContext.WEB)
+
+    def execute(self, slideshow_context: SlideshowContext, **kwargs) -> Dict[str, Any]:
+        # Check if gallery is enabled for this session
+        if not getattr(slideshow_context, 'gallery_enabled', False):
+            return {
+                "success": False,
+                "error": "Gallery mode not enabled",
+                "gallery_mode_active": False
+            }
+
+        # Toggle gallery_mode_active
+        slideshow_context.gallery_mode_active = not getattr(slideshow_context, 'gallery_mode_active', False)
+
+        return {
+            "gallery_mode_active": slideshow_context.gallery_mode_active,
+            "success": True
+        }
 
 
 # Speed Control Actions
@@ -607,7 +631,8 @@ def register_default_actions():
     action_registry.register(ToggleRepeatAction())
     action_registry.register(ToggleShuffleAction())
     action_registry.register(ToggleAlwaysOnTopAction())
-    
+    action_registry.register(ToggleGalleryModeAction())
+
     # Speed
     action_registry.register(IncreaseSpeedAction())
     action_registry.register(DecreaseSpeedAction())

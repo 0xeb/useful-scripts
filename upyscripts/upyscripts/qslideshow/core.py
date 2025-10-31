@@ -7,7 +7,7 @@ Contains shared components used by both GUI and web server implementations.
 import random
 import fnmatch
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 
 
 # Default image file extensions
@@ -71,7 +71,9 @@ class SlideshowContext:
 
     def __init__(self, image_paths: List[Path], speed: float = 3.0, repeat: bool = False,
                  fit_mode: str = 'shrink', status_format: Optional[str] = None,
-                 always_on_top: bool = False, shuffle: bool = False, paused: bool = False):
+                 always_on_top: bool = False, shuffle: bool = False, paused: bool = False,
+                 gallery_enabled: bool = False, gallery_grid: Optional[Tuple[int, int]] = None,
+                 gallery_thumbnail_size: Tuple[int, int] = (200, 200)):
         # Core image data
         self.image_paths = image_paths
         self.original_image_paths = image_paths.copy()
@@ -86,10 +88,16 @@ class SlideshowContext:
         self.always_on_top = always_on_top
         self.shuffle = shuffle
 
+        # Gallery settings (web mode only)
+        self.gallery_enabled = gallery_enabled
+        self.gallery_grid = gallery_grid  # (rows, cols) tuple or None for auto/responsive
+        self.gallery_thumbnail_size = gallery_thumbnail_size  # (width, height) tuple
+
         # Runtime state
         self.is_paused = paused
         self.repeat_count = 0
         self.authenticated = False  # Web mode authentication state
+        self.gallery_mode_active = gallery_enabled  # Runtime toggle state for gallery view
 
         # Apply shuffle if requested
         if self.shuffle:
