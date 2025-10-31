@@ -18,6 +18,50 @@ from .core import (
 from .config import ConfigManager
 
 
+def parse_grid_size(value):
+    """
+    Parse grid size in ROWSxCOLS format (e.g., '4x5' = 4 rows, 5 columns).
+    Returns tuple (rows, cols) or raises argparse.ArgumentTypeError.
+    """
+    if not value or value.lower() == 'auto':
+        return None  # Auto/responsive mode
+    try:
+        parts = value.lower().split('x')
+        if len(parts) != 2:
+            raise ValueError
+        rows, cols = int(parts[0]), int(parts[1])
+        if rows < 1 or cols < 1:
+            raise ValueError("Grid dimensions must be positive")
+        if rows > 50 or cols > 50:
+            raise ValueError("Grid dimensions too large (max 50x50)")
+        return (rows, cols)
+    except (ValueError, IndexError) as e:
+        raise argparse.ArgumentTypeError(
+            f"Invalid grid size '{value}'. Use format: ROWSxCOLS (e.g., '4x5') or 'auto'"
+        ) from e
+
+
+def parse_size(value):
+    """
+    Parse size in WIDTHxHEIGHT format (e.g., '200x200').
+    Returns tuple (width, height) or raises argparse.ArgumentTypeError.
+    """
+    try:
+        parts = value.lower().split('x')
+        if len(parts) != 2:
+            raise ValueError
+        width, height = int(parts[0]), int(parts[1])
+        if width < 10 or height < 10:
+            raise ValueError("Dimensions must be at least 10x10 pixels")
+        if width > 2000 or height > 2000:
+            raise ValueError("Dimensions too large (max 2000x2000)")
+        return (width, height)
+    except (ValueError, IndexError) as e:
+        raise argparse.ArgumentTypeError(
+            f"Invalid size '{value}'. Use format: WIDTHxHEIGHT (e.g., '200x200')"
+        ) from e
+
+
 def parse_arguments(args=None):
     """Parse command line arguments."""
     # Build status line presets for epilog dynamically from STATUS_PRESETS
@@ -151,6 +195,33 @@ Template variables:
         '--web-dev',
         action='store_true',
         help='Development mode: disable browser caching for live editing of web files'
+    )
+
+    parser.add_argument(
+        '--web-gallery',
+        nargs='?',
+        const='auto',
+        type=parse_grid_size,
+        metavar='ROWSxCOLS',
+        help='Enable gallery mode with grid layout (e.g., "4x5" for 4 rows, 5 columns, '
+             'or "auto" for responsive). If used without value, defaults to "auto". '
+             'Web mode only.'
+    )
+
+    parser.add_argument(
+        '--web-gallery-grid',
+        type=parse_grid_size,
+        metavar='ROWSxCOLS',
+        help='Grid size for gallery mode (e.g., "4x5" for 4 rows, 5 columns, or "auto"). '
+             'Overrides --web-gallery if both are specified.'
+    )
+
+    parser.add_argument(
+        '--web-gallery-thumbnail-size',
+        type=parse_size,
+        metavar='WIDTHxHEIGHT',
+        default=(200, 200),
+        help='Thumbnail size for gallery mode in pixels (default: 200x200, e.g., "150x150")'
     )
 
     # Generate QSS_* environment variable names from TEMPLATE_VARIABLES
