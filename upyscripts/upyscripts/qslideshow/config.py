@@ -56,6 +56,13 @@ web:
   enable_pwa: true  # Enable Progressive Web App features
   dev_mode: false  # Disable caching for development
 
+# Gallery mode settings (web mode only)
+gallery:
+  enabled: false  # Enable gallery view mode
+  grid: null  # Grid size as [rows, cols] tuple, or null for auto/responsive
+  # Examples: [4, 5] for 4 rows and 5 columns, null for automatic sizing
+  thumbnail_size: [200, 200]  # Thumbnail dimensions [width, height] in pixels
+
 # External tools configuration
 external_tools:
   base_name: "tool"  # Base name for tool scripts
@@ -141,6 +148,7 @@ hotkeys:
   web:
     toggle_help: "h"  # H key - show help modal
     toggle_picture_in_picture: "t"  # T key - toggle PiP mode
+    toggle_gallery_mode: "g"  # G key - toggle between gallery and slideshow views
     close_modal:
       - "Escape"  # Escape key
       - "q"  # Q key
@@ -314,12 +322,34 @@ gestures:
             'external_tools': 'external_tools.base_name',
             'dev_mode': 'web.dev_mode'
         }
-        
+
         for arg_name, config_path in arg_mapping.items():
             if hasattr(args, arg_name):
                 value = getattr(args, arg_name)
                 if value is not None:
                     self.set(config_path, value)
+
+        # Handle gallery-specific arguments
+        if hasattr(args, 'web_gallery'):
+            web_gallery = getattr(args, 'web_gallery')
+            if web_gallery is not None:
+                # If --web-gallery is provided, enable gallery mode
+                self.set('gallery.enabled', True)
+                # If --web-gallery has a value (grid size), use it
+                if web_gallery is not True:  # Not just a flag
+                    self.set('gallery.grid', web_gallery)
+
+        # Override grid if --web-gallery-grid is explicitly provided
+        if hasattr(args, 'web_gallery_grid'):
+            web_gallery_grid = getattr(args, 'web_gallery_grid')
+            if web_gallery_grid is not None:
+                self.set('gallery.grid', web_gallery_grid)
+
+        # Handle thumbnail size
+        if hasattr(args, 'web_gallery_thumbnail_size'):
+            thumb_size = getattr(args, 'web_gallery_thumbnail_size')
+            if thumb_size is not None:
+                self.set('gallery.thumbnail_size', thumb_size)
     
     def get_hotkeys(self, context: str = 'common') -> Dict[str, Any]:
         """Get hotkey configuration for a specific context."""
