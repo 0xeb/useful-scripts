@@ -10,21 +10,62 @@ class WebSlideshow {
         this.shuffle = false;
         this.wakeLock = null;
         this.wakeLockReacquireInterval = null;
-        this.isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                           window.navigator.standalone || 
+        this.isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                           window.navigator.standalone ||
                            document.referrer.includes('android-app://');
-        
+
+        // Generate unique session ID for this tab/window
+        this.sessionId = this.generateSessionId();
+        console.log('Session ID:', this.sessionId);
+
         // Action system data
         this.hotkeys = {};
         this.gestures = {};
         this.actions = [];
-        
+
+        // Gallery mode properties
+        this.galleryConfig = null;
+        this.galleryModeActive = false;
+        this.currentGalleryPage = 0;
+        this.fullscreenViewerActive = false;
+        this.fullscreenImageIndex = 0;
+
+        // Touch tracking for double-tap and swipe in fullscreen viewer
+        this.lastTapTime = 0;
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+
         this.init();
+    }
+
+    generateSessionId() {
+        // Use crypto.randomUUID() if available, otherwise fallback
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        // Fallback for older browsers
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    getRequestOptions(options = {}) {
+        // Add session ID header to all requests
+        const headers = options.headers || {};
+        headers['X-Session-ID'] = this.sessionId;
+        return {
+            ...options,
+            credentials: 'include',
+            headers: headers
+        };
     }
     
     async init() {
         await this.loadImages();
         await this.loadConfig();
+        await this.loadGalleryConfig();
         await this.loadHotkeys();
         await this.loadGestures();
         await this.loadActions();
@@ -32,14 +73,23 @@ class WebSlideshow {
         this.setupGestureHandlers();
         this.setupWakeLock();
         this.checkInstallPrompt();
-        this.displayCurrentImage();
-        this.startAutoAdvance();
+
+        // Initialize view based on gallery mode
+        if (this.galleryModeActive) {
+            this.showGalleryView();
+        } else {
+            this.displayCurrentImage();
+            this.startAutoAdvance();
+        }
+
         this.startStatusPolling();
+        this.setupGalleryEventHandlers();
+        this.setupFullscreenEventHandlers();
     }
     
     async loadImages() {
         try {
-            const response = await fetch('/api/images', { credentials: 'include' });
+            const response = await fetch('/api/images', this.getRequestOptions());
             const data = await response.json();
             this.images = data.images;
             console.log(`Loaded ${this.images.length} images`);
@@ -47,10 +97,10 @@ class WebSlideshow {
             console.error('Failed to load images:', error);
         }
     }
-    
+
     async loadConfig() {
         try {
-            const response = await fetch('/api/config', { credentials: 'include' });
+            const response = await fetch('/api/config', this.getRequestOptions());
             this.config = await response.json();
             this.speedSeconds = this.config.speed || 3.0;
             this.repeat = this.config.repeat || false;
@@ -59,10 +109,10 @@ class WebSlideshow {
             console.error('Failed to load config:', error);
         }
     }
-    
+
     async loadHotkeys() {
         try {
-            const response = await fetch('/api/hotkeys', { credentials: 'include' });
+            const response = await fetch('/api/hotkeys', this.getRequestOptions());
             const data = await response.json();
             this.hotkeys = data.hotkeys || {};
             console.log('Loaded hotkey mappings:', this.hotkeys);
@@ -70,10 +120,10 @@ class WebSlideshow {
             console.error('Failed to load hotkeys:', error);
         }
     }
-    
+
     async loadGestures() {
         try {
-            const response = await fetch('/api/gestures', { credentials: 'include' });
+            const response = await fetch('/api/gestures', this.getRequestOptions());
             const data = await response.json();
             this.gestures = data.gestures || {};
             console.log('Loaded gesture mappings:', this.gestures);
@@ -84,7 +134,7 @@ class WebSlideshow {
     
     async loadActions() {
         try {
-            const response = await fetch('/api/actions', { credentials: 'include' });
+            const response = await fetch('/api/actions', this.getRequestOptions());
             const data = await response.json();
             this.actions = data.actions || [];
             console.log(`Loaded ${this.actions.length} actions`);
@@ -98,18 +148,31 @@ class WebSlideshow {
             // Don't handle shortcuts when help is visible
             const helpModal = document.getElementById('help-modal');
             const helpVisible = helpModal && helpModal.style.display === 'block';
-            
+
             if (helpVisible && e.key !== 'Escape' && e.key !== 'h' && e.key !== 'H') {
                 return;
             }
-            
+
+            // Special handling for PageUp/PageDown in gallery mode
+            if (this.galleryModeActive && !this.fullscreenViewerActive) {
+                if (e.key === 'PageUp') {
+                    e.preventDefault();
+                    this.goToGalleryPage(this.currentGalleryPage - 1);
+                    return;
+                } else if (e.key === 'PageDown') {
+                    e.preventDefault();
+                    this.goToGalleryPage(this.currentGalleryPage + 1);
+                    return;
+                }
+            }
+
             // Build key string with modifiers
             let keyString = '';
             if (e.ctrlKey) keyString += 'ctrl+';
             if (e.altKey) keyString += 'alt+';
             if (e.shiftKey) keyString += 'shift+';
             if (e.metaKey) keyString += 'meta+';
-            
+
             // Normalize key name
             let key = e.key;
             if (key === 'ArrowLeft') key = 'arrowleft';
@@ -119,10 +182,12 @@ class WebSlideshow {
             else if (key === ' ') key = 'space';
             else if (key === 'Enter') key = 'enter';
             else if (key === 'Escape') key = 'esc';
+            else if (key === 'PageUp') key = 'pageup';
+            else if (key === 'PageDown') key = 'pagedown';
             else key = key.toLowerCase();
-            
+
             keyString += key;
-            
+
             // Check if this key is mapped to an action
             const action = this.hotkeys[keyString];
             if (action) {
@@ -189,15 +254,14 @@ class WebSlideshow {
     
     async sendGesture(eventType, touches) {
         try {
-            const response = await fetch('/api/gesture', {
+            const response = await fetch('/api/gesture', this.getRequestOptions({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
                 body: JSON.stringify({
                     event_type: eventType,
                     touches: touches
                 })
-            });
+            }));
             const result = await response.json();
             if (result.success) {
                 this.handleActionResult(result);
@@ -216,15 +280,14 @@ class WebSlideshow {
     
     async executeAction(actionName, params = {}) {
         try {
-            const response = await fetch('/api/execute', {
+            const response = await fetch('/api/execute', this.getRequestOptions({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
                 body: JSON.stringify({
                     action: actionName,
                     params: params
                 })
-            });
+            }));
             const result = await response.json();
             if (result.success) {
                 this.handleActionResult(result);
@@ -259,6 +322,11 @@ class WebSlideshow {
             this.repeat = result.repeat;
             console.log('Repeat:', this.repeat ? 'on' : 'off');
             this.updateStatus();
+            // Reset timer when repeat mode changes
+            if (!this.isPaused) {
+                this.resetTimer();
+                this.startAutoAdvance();
+            }
         }
         
         if ('shuffle' in result) {
@@ -269,14 +337,35 @@ class WebSlideshow {
             }
             console.log('Shuffle:', this.shuffle ? 'on' : 'off');
             this.updateStatus();
+            // Reset timer when shuffle mode changes
+            if (!this.isPaused) {
+                this.resetTimer();
+                this.startAutoAdvance();
+            }
         }
         
         if ('speed' in result) {
             this.speedSeconds = result.speed;
             console.log(`Speed: ${this.speedSeconds}s`);
             this.updateStatus();
+            // Reset timer to apply new speed immediately
+            if (!this.isPaused) {
+                this.resetTimer();
+                this.startAutoAdvance();
+            }
         }
-        
+
+        if ('gallery_mode_active' in result) {
+            this.galleryModeActive = result.gallery_mode_active;
+            console.log('Gallery mode:', this.galleryModeActive ? 'on' : 'off');
+
+            if (this.galleryModeActive) {
+                this.showGalleryView();
+            } else {
+                this.showSlideshowView();
+            }
+        }
+
         if ('is_fullscreen' in result && result.action === 'toggle_fullscreen') {
             this.toggleFullscreen();
         }
@@ -557,7 +646,7 @@ class WebSlideshow {
     async startStatusPolling() {
         setInterval(async () => {
             try {
-                const response = await fetch('/api/status', { credentials: 'include' });
+                const response = await fetch('/api/status', this.getRequestOptions());
                 const status = await response.json();
                 
                 if (status.current_index !== this.currentIndex) {
@@ -605,6 +694,363 @@ class WebSlideshow {
                     }
                 });
             }
+        }
+    }
+
+    // ============ Gallery Mode Methods ============
+
+    async loadGalleryConfig() {
+        try {
+            const response = await fetch('/api/gallery/config', this.getRequestOptions());
+            if (response.ok) {
+                this.galleryConfig = await response.json();
+                this.galleryModeActive = this.galleryConfig.enabled;
+                console.log('Gallery config loaded:', this.galleryConfig);
+            } else {
+                // Gallery not enabled or not available
+                this.galleryConfig = null;
+                this.galleryModeActive = false;
+            }
+        } catch (error) {
+            console.log('Gallery mode not available:', error);
+            this.galleryConfig = null;
+            this.galleryModeActive = false;
+        }
+    }
+
+    async toggleGalleryMode() {
+        if (!this.galleryConfig || !this.galleryConfig.enabled) {
+            console.warn('Gallery mode not enabled');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/gallery/toggle', this.getRequestOptions({
+                method: 'POST'
+            }));
+
+            if (response.ok) {
+                const result = await response.json();
+                this.galleryModeActive = result.gallery_mode_active;
+
+                if (this.galleryModeActive) {
+                    this.showGalleryView();
+                } else {
+                    this.showSlideshowView();
+                }
+            }
+        } catch (error) {
+            console.error('Failed to toggle gallery mode:', error);
+        }
+    }
+
+    showGalleryView() {
+        // Stop auto-advance
+        this.stopAutoAdvance();
+
+        // Switch containers
+        const slideshowContainer = document.getElementById('slideshow-container');
+        const galleryContainer = document.getElementById('gallery-container');
+
+        if (slideshowContainer) slideshowContainer.classList.add('hidden');
+        if (galleryContainer) galleryContainer.classList.add('active');
+
+        // Render gallery
+        this.renderGallery();
+    }
+
+    showSlideshowView() {
+        // Switch containers
+        const slideshowContainer = document.getElementById('slideshow-container');
+        const galleryContainer = document.getElementById('gallery-container');
+
+        if (slideshowContainer) slideshowContainer.classList.remove('hidden');
+        if (galleryContainer) galleryContainer.classList.remove('active');
+
+        // Resume slideshow
+        this.displayCurrentImage();
+        if (!this.isPaused) {
+            this.startAutoAdvance();
+        }
+    }
+
+    renderGallery() {
+        if (!this.galleryConfig) return;
+
+        const grid = document.getElementById('gallery-grid');
+        if (!grid) return;
+
+        // Clear existing grid
+        grid.innerHTML = '';
+
+        // Calculate images for current page
+        let startIdx, endIdx;
+
+        if (this.galleryConfig.images_per_page) {
+            // Fixed grid mode
+            startIdx = this.currentGalleryPage * this.galleryConfig.images_per_page;
+            endIdx = Math.min(startIdx + this.galleryConfig.images_per_page, this.images.length);
+        } else {
+            // Auto/responsive mode - show all images
+            startIdx = 0;
+            endIdx = this.images.length;
+        }
+
+        // Render thumbnails
+        for (let i = startIdx; i < endIdx; i++) {
+            const image = this.images[i];
+            const item = document.createElement('div');
+            item.className = 'gallery-item';
+            item.dataset.index = i;
+
+            const img = document.createElement('img');
+            img.src = `/api/thumbnail/${i}`;
+            img.alt = image.name;
+            img.loading = 'lazy';
+
+            const indexLabel = document.createElement('div');
+            indexLabel.className = 'gallery-item-index';
+            indexLabel.textContent = i + 1;
+
+            item.appendChild(img);
+            item.appendChild(indexLabel);
+            grid.appendChild(item);
+        }
+
+        // Update pagination
+        this.updatePagination();
+    }
+
+    updatePagination() {
+        if (!this.galleryConfig || !this.galleryConfig.total_pages) {
+            // Hide pagination in auto mode
+            const pagination = document.getElementById('gallery-pagination');
+            if (pagination) pagination.style.display = 'none';
+            return;
+        }
+
+        const pagination = document.getElementById('gallery-pagination');
+        if (pagination) pagination.style.display = 'flex';
+
+        const totalPages = this.galleryConfig.total_pages;
+        const currentPage = this.currentGalleryPage;
+
+        // Update button states
+        document.getElementById('page-first').disabled = currentPage === 0;
+        document.getElementById('page-prev').disabled = currentPage === 0;
+        document.getElementById('page-next').disabled = currentPage === totalPages - 1;
+        document.getElementById('page-last').disabled = currentPage === totalPages - 1;
+
+        // Render page numbers
+        const pageNumbers = document.getElementById('page-numbers');
+        pageNumbers.innerHTML = '';
+
+        // Calculate which page numbers to show (max 7)
+        let pages = [];
+        if (totalPages <= 7) {
+            // Show all pages
+            pages = Array.from({length: totalPages}, (_, i) => i);
+        } else {
+            // Show first, last, current, and neighbors with ellipsis
+            pages = [0]; // Always show first page
+
+            if (currentPage > 2) {
+                // Add ellipsis
+                pages.push('...');
+            }
+
+            // Add neighbors
+            for (let i = Math.max(1, currentPage - 1); i <= Math.min(totalPages - 2, currentPage + 1); i++) {
+                if (!pages.includes(i)) {
+                    pages.push(i);
+                }
+            }
+
+            if (currentPage < totalPages - 3) {
+                pages.push('...');
+            }
+
+            if (totalPages > 1) {
+                pages.push(totalPages - 1); // Always show last page
+            }
+        }
+
+        // Render page numbers
+        pages.forEach(page => {
+            if (page === '...') {
+                const ellipsis = document.createElement('span');
+                ellipsis.className = 'page-ellipsis';
+                ellipsis.textContent = '...';
+                pageNumbers.appendChild(ellipsis);
+            } else {
+                const btn = document.createElement('button');
+                btn.className = 'page-number';
+                if (page === currentPage) {
+                    btn.classList.add('current');
+                }
+                btn.textContent = page + 1;
+                btn.dataset.page = page;
+                pageNumbers.appendChild(btn);
+            }
+        });
+    }
+
+    goToGalleryPage(page) {
+        if (!this.galleryConfig) return;
+
+        const totalPages = this.galleryConfig.total_pages || 1;
+        this.currentGalleryPage = Math.max(0, Math.min(page, totalPages - 1));
+        this.renderGallery();
+    }
+
+    // ============ Full-screen Viewer Methods ============
+
+    showFullscreenViewer(imageIndex) {
+        this.fullscreenViewerActive = true;
+        this.fullscreenImageIndex = imageIndex;
+
+        const viewer = document.getElementById('fullscreen-viewer');
+        const img = document.getElementById('fullscreen-image');
+        const indexLabel = document.getElementById('fullscreen-index');
+
+        if (viewer) viewer.classList.add('active');
+        if (img) img.src = `/api/image/${imageIndex}`;
+        if (indexLabel) indexLabel.textContent = `${imageIndex + 1} / ${this.images.length}`;
+    }
+
+    closeFullscreenViewer() {
+        this.fullscreenViewerActive = false;
+
+        const viewer = document.getElementById('fullscreen-viewer');
+        if (viewer) viewer.classList.remove('active');
+    }
+
+    navigateFullscreenViewer(direction) {
+        const newIndex = this.fullscreenImageIndex + direction;
+
+        if (newIndex >= 0 && newIndex < this.images.length) {
+            this.showFullscreenViewer(newIndex);
+        } else if (this.repeat) {
+            // Wrap around if repeat is enabled
+            if (newIndex < 0) {
+                this.showFullscreenViewer(this.images.length - 1);
+            } else {
+                this.showFullscreenViewer(0);
+            }
+        }
+    }
+
+    // ============ Event Handlers ============
+
+    setupGalleryEventHandlers() {
+        // Gallery item clicks
+        document.addEventListener('click', (e) => {
+            const galleryItem = e.target.closest('.gallery-item');
+            if (galleryItem) {
+                const index = parseInt(galleryItem.dataset.index);
+                this.showFullscreenViewer(index);
+            }
+        });
+
+        // Pagination button clicks
+        document.getElementById('page-first')?.addEventListener('click', () => {
+            this.goToGalleryPage(0);
+        });
+
+        document.getElementById('page-prev')?.addEventListener('click', () => {
+            this.goToGalleryPage(this.currentGalleryPage - 1);
+        });
+
+        document.getElementById('page-next')?.addEventListener('click', () => {
+            this.goToGalleryPage(this.currentGalleryPage + 1);
+        });
+
+        document.getElementById('page-last')?.addEventListener('click', () => {
+            if (this.galleryConfig) {
+                this.goToGalleryPage(this.galleryConfig.total_pages - 1);
+            }
+        });
+
+        // Page number clicks
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('page-number')) {
+                const page = parseInt(e.target.dataset.page);
+                this.goToGalleryPage(page);
+            }
+        });
+    }
+
+    setupFullscreenEventHandlers() {
+        // Close button
+        document.getElementById('fullscreen-close')?.addEventListener('click', () => {
+            this.closeFullscreenViewer();
+        });
+
+        // Navigation buttons
+        document.getElementById('fullscreen-prev')?.addEventListener('click', () => {
+            this.navigateFullscreenViewer(-1);
+        });
+
+        document.getElementById('fullscreen-next')?.addEventListener('click', () => {
+            this.navigateFullscreenViewer(1);
+        });
+
+        // Keyboard navigation in fullscreen viewer
+        document.addEventListener('keydown', (e) => {
+            if (!this.fullscreenViewerActive) return;
+
+            if (e.key === 'Escape' || e.key === 'q' || e.key === 'Q') {
+                this.closeFullscreenViewer();
+                e.preventDefault();
+            } else if (e.key === 'ArrowLeft') {
+                this.navigateFullscreenViewer(-1);
+                e.preventDefault();
+            } else if (e.key === 'ArrowRight') {
+                this.navigateFullscreenViewer(1);
+                e.preventDefault();
+            }
+        });
+
+        // Touch events for fullscreen viewer
+        const viewer = document.getElementById('fullscreen-viewer');
+        if (viewer) {
+            viewer.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    this.touchStartX = e.touches[0].clientX;
+                    this.touchStartY = e.touches[0].clientY;
+                }
+            });
+
+            viewer.addEventListener('touchend', (e) => {
+                if (!e.changedTouches || e.changedTouches.length === 0) return;
+
+                const touch = e.changedTouches[0];
+                const deltaX = touch.clientX - this.touchStartX;
+                const deltaY = touch.clientY - this.touchStartY;
+
+                // Check for swipe (horizontal movement > vertical)
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+                    if (deltaX > 0) {
+                        // Swipe right - go to previous
+                        this.navigateFullscreenViewer(-1);
+                    } else {
+                        // Swipe left - go to next
+                        this.navigateFullscreenViewer(1);
+                    }
+                    e.preventDefault();
+                } else {
+                    // Check for double-tap to close
+                    const now = Date.now();
+                    const tapInterval = now - this.lastTapTime;
+                    this.lastTapTime = now;
+
+                    if (tapInterval < 300 && tapInterval > 0) {
+                        // Double tap detected
+                        this.closeFullscreenViewer();
+                        e.preventDefault();
+                    }
+                }
+            });
         }
     }
 }

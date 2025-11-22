@@ -7,10 +7,6 @@ UPLOAD_FOLDER = './uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 DEFAULT_PORT = 5001
 
-# Make sure the upload folder exists
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
 # HTML template for file upload page with progress
 UPLOAD_HTML = """
 <!doctype html>

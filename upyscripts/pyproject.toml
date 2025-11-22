@@ -40,11 +40,14 @@ dependencies = [
     "numpy",
     "pytz",
     "tzlocal",
+    "PyYAML",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "playwright>=1.40",
+    "pytest-playwright>=0.4.0",
     "black",
     "flake8",
     "mypy",
@@ -56,6 +59,7 @@ dev = [
 "upy.file_upload" = "upyscripts.file_upload:main"
 "upy.ghview" = "upyscripts.ghview:main"
 "upy.html_entities" = "upyscripts.html_entities:main"
+"upy.imgsxs" = "upyscripts.imgsxs:main"
 "upy.jsonutils" = "upyscripts.jsonutils:main"
 "upy.markdown_render" = "upyscripts.markdown_render:main"
 "upy.mdcomdec" = "upyscripts.mdcomdec:main"
