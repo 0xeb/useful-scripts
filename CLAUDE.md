@@ -24,6 +24,7 @@ This installs the following command-line tools with `upy.` prefix:
 - `upy.jsonutils` - JSON utility tool (beautify, minify, validate, tree view, query)
 - `upy.markdown_render` - Render Markdown to HTML on localhost
 - `upy.mdcomdec` - Decompose/recompose Markdown files
+- `upy.mksctxt` - Convert Markdown to styled PNG images with syntax highlighting
 - `upy.parse_vcf` - Parse VCF contact files
 - `upy.pdf3img` - Convert PDF pages to images
 - `upy.preprocess` - Preprocessing utility

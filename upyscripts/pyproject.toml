@@ -71,6 +71,7 @@ dev = [
 "upy.qslideshow" = "upyscripts.qslideshow.cli:main"
 "upy.dll2proj" = "upyscripts.dll2proj.dll2proj:main"
 "upy.dlcalc" = "upyscripts.dlcalc:main"
+"upy.mksctxt" = "upyscripts.mksctxt:main"
 "upy.help" = "upyscripts.help_command:main"
 
 [project.urls]

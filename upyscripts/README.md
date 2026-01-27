@@ -110,6 +110,30 @@ upy.markdown_render docs/manual.md --port 8080
 upy.markdown_render --watch document.md
 ```
 
+### mksctxt.py
+Converts Markdown files to beautiful, stylized PNG images with syntax highlighting. Features Dracula theme, macOS-style window frame, and code block rendering with Pygments.
+
+```bash
+# Basic conversion
+upy.mksctxt README.md -o screenshot.png
+
+# High-resolution output (4x scale)
+upy.mksctxt code_snippet.md -o hires.png --scale 4
+
+# Custom width without window frame
+upy.mksctxt notes.md -o clean.png -w 1200 --no-window
+
+# Default settings (800px width, 2x scale, with window frame)
+upy.mksctxt input.md
+```
+
+Supported Markdown elements:
+- Headers (H1, H2, H3)
+- Paragraphs with bold/italic
+- Bullet lists
+- Blockquotes
+- Syntax-highlighted code blocks (all Pygments-supported languages)
+
 ### mdcomdec.py
 Markdown file decomposer/composer with two modes:
 - **Decompose**: Splits a single Markdown file into multiple organized files
