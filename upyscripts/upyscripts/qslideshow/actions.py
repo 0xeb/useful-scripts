@@ -6,7 +6,7 @@ Provides a unified way to define and execute actions across GUI and Web interfac
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Dict, Optional, List, Callable
+from typing import TYPE_CHECKING, Any, Dict, Optional, List, Callable
 from enum import Enum
 from pathlib import Path
 import os
@@ -71,6 +71,47 @@ class ActionRegistry:
 action_registry = ActionRegistry()
 
 
+def _get_total_images(slideshow_context: SlideshowContext) -> int:
+    """Get total image count, using image_order in web mode."""
+    return (len(slideshow_context.image_order)
+            if hasattr(slideshow_context, 'image_order')
+            else len(slideshow_context.image_paths))
+
+
+def _skip_filtered(slideshow_context: SlideshowContext, direction: int) -> None:
+    """Advance past images rejected by the filter script (if any).
+
+    Loop protection: stops after checking all images to prevent infinite loop.
+    """
+    filter_runner = getattr(slideshow_context, 'filter_runner', None)
+    if not filter_runner:
+        return
+
+    total = _get_total_images(slideshow_context)
+    if total == 0:
+        return
+
+    for _ in range(total):
+        if filter_runner.should_display(slideshow_context):
+            return  # current image passes filter
+        # Skip: advance in the given direction
+        slideshow_context.current_index += direction
+        if slideshow_context.current_index >= total:
+            if slideshow_context.repeat:
+                slideshow_context.current_index = 0
+                slideshow_context.repeat_count += 1
+            else:
+                slideshow_context.current_index = total - 1
+                return  # hit end, stop
+        elif slideshow_context.current_index < 0:
+            if slideshow_context.repeat:
+                slideshow_context.current_index = total - 1
+            else:
+                slideshow_context.current_index = 0
+                return  # hit start, stop
+    # All images filtered — show current one anyway (loop protection)
+
+
 # Navigation Actions
 class NavigateNextAction(Action):
     """Navigate to the next image in the slideshow."""
@@ -81,10 +122,7 @@ class NavigateNextAction(Action):
     def execute(self, slideshow_context: SlideshowContext, **kwargs) -> Dict[str, Any]:
         slideshow_context.current_index += 1
 
-        # Use image_order length if available (web mode), otherwise image_paths
-        total_images = (len(slideshow_context.image_order)
-                       if hasattr(slideshow_context, 'image_order')
-                       else len(slideshow_context.image_paths))
+        total_images = _get_total_images(slideshow_context)
 
         if slideshow_context.current_index >= total_images:
             if slideshow_context.repeat:
@@ -92,6 +130,8 @@ class NavigateNextAction(Action):
                 slideshow_context.repeat_count += 1
             else:
                 slideshow_context.current_index = total_images - 1
+
+        _skip_filtered(slideshow_context, direction=1)
         return {"current_index": slideshow_context.current_index}
 
 
@@ -104,16 +144,15 @@ class NavigatePreviousAction(Action):
     def execute(self, slideshow_context: SlideshowContext, **kwargs) -> Dict[str, Any]:
         slideshow_context.current_index -= 1
 
-        # Use image_order length if available (web mode), otherwise image_paths
-        total_images = (len(slideshow_context.image_order)
-                       if hasattr(slideshow_context, 'image_order')
-                       else len(slideshow_context.image_paths))
+        total_images = _get_total_images(slideshow_context)
 
         if slideshow_context.current_index < 0:
             if slideshow_context.repeat:
                 slideshow_context.current_index = total_images - 1
             else:
                 slideshow_context.current_index = 0
+
+        _skip_filtered(slideshow_context, direction=-1)
         return {"current_index": slideshow_context.current_index}
 
 
@@ -455,6 +494,67 @@ class UndoableAction(Action):
         pass
 
 
+# Script Hook Runners
+class ScriptRunner:
+    """Base class for running external hook scripts with QSS_* environment variables."""
+
+    def __init__(self, script_path: Path):
+        self.script_path = Path(script_path)
+        if not self.script_path.exists():
+            print(f"Warning: script not found: {self.script_path}")
+
+    def _run(self, env_vars: Dict[str, str]) -> subprocess.CompletedProcess:
+        """Run the script with the given environment variables merged into os.environ."""
+        env = os.environ.copy()
+        env.update(env_vars)
+        return subprocess.run(
+            [str(self.script_path)],
+            env=env,
+            capture_output=True,
+            text=True
+        )
+
+
+class FilterScriptRunner(ScriptRunner):
+    """Pre-display filter: runs before each image, rc 0=show, non-zero=skip."""
+
+    def should_display(self, slideshow_context: SlideshowContext) -> bool:
+        """Return True if the current image should be displayed."""
+        if not self.script_path.exists():
+            return True
+        try:
+            result = self._run(slideshow_context.get_environment_variables())
+            return result.returncode == 0
+        except Exception as e:
+            print(f"Filter script error: {e}")
+            return True  # show on error
+
+
+class PostScriptRunner(ScriptRunner):
+    """Post-tool hook: runs after any external tool (0-9) completes."""
+
+    def run_post_hook(self, slideshow_context: SlideshowContext,
+                      tool_id: str, tool_rc: int,
+                      tool_stdout: str, tool_stderr: str,
+                      prev_full_path: str, prev_img_name: str,
+                      img_removed: bool) -> None:
+        """Run the post-tool hook script. Fire-and-forget (errors are logged, never raised)."""
+        if not self.script_path.exists():
+            return
+        try:
+            env_vars = slideshow_context.get_environment_variables()
+            env_vars['QSS_TOOL_ID'] = str(tool_id)
+            env_vars['QSS_TOOL_RC'] = str(tool_rc)
+            env_vars['QSS_TOOL_STDOUT'] = tool_stdout or ''
+            env_vars['QSS_TOOL_STDERR'] = tool_stderr or ''
+            env_vars['QSS_PREV_FULL_PATH'] = prev_full_path
+            env_vars['QSS_PREV_IMG_NAME'] = prev_img_name
+            env_vars['QSS_IMG_REMOVED'] = '1' if img_removed else ''
+            self._run(env_vars)
+        except Exception as e:
+            print(f"Post script error: {e}")
+
+
 # External Tool Support
 class ExternalToolAction(Action):
     """Execute an external tool/script with environment variables."""
@@ -478,22 +578,27 @@ class ExternalToolAction(Action):
     def execute(self, slideshow_context: SlideshowContext, **kwargs) -> Dict[str, Any]:
         if not self.tool_path or not self.tool_path.exists():
             return {"error": f"Tool {self.tool_id} not found"}
-        
+
         if not slideshow_context.image_paths:
             return {"error": "No images in slideshow"}
-        
+
+        # Snapshot state before tool runs (for post script)
+        prev_path = slideshow_context.current_path
+        prev_full_path = str(prev_path.resolve()) if prev_path else ''
+        prev_img_name = prev_path.name if prev_path else ''
+
         # Build environment variables dynamically from template variables
         env = os.environ.copy()
-        
+
         # Get all template variables as environment variables with QSS_ prefix
         env.update(slideshow_context.get_environment_variables())
-        
+
         # Add tool-specific variables that aren't in template variables
         env['QSS_TOOL_ID'] = str(self.tool_id)
-        
+
         # Add alternative name for index for backward compatibility
         env['QSS_IMG_INDEX'] = env.get('QSS_IMG_IDX', '1')
-        
+
         try:
             result = subprocess.run(
                 [str(self.tool_path)],
@@ -501,22 +606,42 @@ class ExternalToolAction(Action):
                 capture_output=True,
                 text=True
             )
-            
+
             # Handle return codes
+            img_removed = False
             if result.returncode == 1:
                 # Tool requests image removal
+                img_removed = True
                 if slideshow_context.image_paths:
                     removed_path = slideshow_context.image_paths[slideshow_context.current_index]
                     slideshow_context.image_paths.pop(slideshow_context.current_index)
                     # Adjust index if necessary
                     if slideshow_context.current_index >= len(slideshow_context.image_paths):
                         slideshow_context.current_index = max(0, len(slideshow_context.image_paths) - 1)
-                    return {"action": "removed", "tool": self.tool_id, "removed_path": str(removed_path)}
+                    ret = {"action": "removed", "tool": self.tool_id, "removed_path": str(removed_path)}
+                else:
+                    ret = {"action": "removed", "tool": self.tool_id}
             elif result.returncode == 0:
-                return {"success": True, "tool": self.tool_id, "output": result.stdout}
+                ret = {"success": True, "tool": self.tool_id, "output": result.stdout}
             else:
-                return {"error": f"Tool {self.tool_id} returned code {result.returncode}", "stderr": result.stderr}
-                
+                ret = {"error": f"Tool {self.tool_id} returned code {result.returncode}", "stderr": result.stderr}
+
+            # Run post script hook if configured
+            post_runner = getattr(slideshow_context, 'post_runner', None)
+            if post_runner:
+                post_runner.run_post_hook(
+                    slideshow_context,
+                    tool_id=self.tool_id,
+                    tool_rc=result.returncode,
+                    tool_stdout=result.stdout,
+                    tool_stderr=result.stderr,
+                    prev_full_path=prev_full_path,
+                    prev_img_name=prev_img_name,
+                    img_removed=img_removed
+                )
+
+            return ret
+
         except Exception as e:
             return {"error": str(e)}
 

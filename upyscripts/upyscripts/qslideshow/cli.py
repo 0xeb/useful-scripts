@@ -238,6 +238,23 @@ Template variables:
     )
     
     parser.add_argument(
+        '--filter-script',
+        type=str,
+        metavar='PATH',
+        help='Path to a pre-display filter script. Called before each image is shown. '
+             'Return code 0: show image, non-zero: skip. Receives QSS_* env vars.'
+    )
+
+    parser.add_argument(
+        '--post-script',
+        type=str,
+        metavar='PATH',
+        help='Path to a post-tool hook script. Called after any external tool (0-9) runs. '
+             'Receives QSS_* env vars plus QSS_TOOL_RC, QSS_TOOL_STDOUT, QSS_TOOL_STDERR, '
+             'QSS_PREV_FULL_PATH, QSS_PREV_IMG_NAME, QSS_IMG_REMOVED.'
+    )
+
+    parser.add_argument(
         '--generate-config',
         action='store_true',
         help='Generate a default config file in current directory and exit'
@@ -303,6 +320,12 @@ def main():
     status_format = None
     if args.status:
         status_format = get_status_template(args.status)
+
+    # Apply filter/post script CLI overrides to config
+    if hasattr(args, 'filter_script') and args.filter_script:
+        config_manager.set('external_tools.filter_script', args.filter_script)
+    if hasattr(args, 'post_script') and args.post_script:
+        config_manager.set('external_tools.post_script', args.post_script)
 
     # Check if web mode is requested
     if args.web:

@@ -67,7 +67,9 @@ gallery:
 external_tools:
   base_name: "tool"  # Base name for tool scripts
   search_dir: "."  # Directory to search for tools (default: current dir)
-  
+  filter_script: null  # Path to pre-display filter script (rc 0=show, non-zero=skip)
+  post_script: null  # Path to post-tool hook script (runs after any tool 0-9)
+
   # Tool discovery looks for scripts matching these patterns:
   # Numeric IDs (0-99): tool0, tool1, ..., tool99
   # Alphabetic IDs (a-z): toola, toolb, ..., toolz

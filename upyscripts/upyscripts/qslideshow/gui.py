@@ -12,7 +12,7 @@ from typing import List, Optional, Dict
 
 from .core import SlideshowContext
 from .config import ConfigManager
-from .actions import action_registry, ExternalToolManager
+from .actions import action_registry, ExternalToolManager, FilterScriptRunner, PostScriptRunner
 from .hotkeys import HotkeyManager, TkinterHotkeyAdapter
 from .gestures import GestureManager
 from .history import ActionHistory, UndoAction, RedoAction
@@ -127,6 +127,17 @@ class ImageSlideshow:
             self.external_tools = tool_manager.tools
             if self.external_tools:
                 print(f"Found external tools for keys: {', '.join(sorted(self.external_tools.keys()))}")
+
+        # Script hooks (filter and post)
+        filter_script = self.config.get('external_tools.filter_script')
+        if filter_script:
+            self.context.filter_runner = FilterScriptRunner(Path(filter_script))
+            print(f"Filter script: {filter_script}")
+
+        post_script = self.config.get('external_tools.post_script')
+        if post_script:
+            self.context.post_runner = PostScriptRunner(Path(post_script))
+            print(f"Post script: {post_script}")
 
         if not self.context.image_paths:
             print("No images found to display.")

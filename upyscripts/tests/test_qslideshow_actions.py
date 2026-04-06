@@ -37,6 +37,8 @@ from upyscripts.qslideshow.actions import (
     NoteAction,
     ExternalToolAction,
     ExternalToolManager,
+    FilterScriptRunner,
+    PostScriptRunner,
     QuitAction,
 )
 
@@ -624,3 +626,262 @@ class TestActionRegistry:
         """Test getting non-existent action."""
         action = action_registry.get("nonexistent_action")
         assert action is None
+
+
+class TestFilterScriptRunner:
+    """Test pre-display filter script runner."""
+
+    def test_filter_allows_image(self, slideshow_context):
+        """Test filter script that allows image (exit 0)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script = Path(tmpdir) / "filter.sh"
+            script.write_text("#!/bin/bash\nexit 0\n")
+            script.chmod(0o755)
+
+            runner = FilterScriptRunner(script)
+            assert runner.should_display(slideshow_context) is True
+
+    def test_filter_skips_image(self, slideshow_context):
+        """Test filter script that rejects image (exit 1)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script = Path(tmpdir) / "filter.sh"
+            script.write_text("#!/bin/bash\nexit 1\n")
+            script.chmod(0o755)
+
+            runner = FilterScriptRunner(script)
+            assert runner.should_display(slideshow_context) is False
+
+    def test_filter_missing_script(self, slideshow_context):
+        """Test graceful handling when filter script doesn't exist."""
+        runner = FilterScriptRunner(Path("/nonexistent/filter.sh"))
+        # Should default to showing image
+        assert runner.should_display(slideshow_context) is True
+
+    def test_filter_env_variables(self, slideshow_context):
+        """Test QSS_* environment variables are passed to filter script."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script = Path(tmpdir) / "filter.sh"
+            script.write_text("#!/bin/bash\nexit 0\n")
+            script.chmod(0o755)
+
+            runner = FilterScriptRunner(script)
+            with patch('subprocess.run') as mock_run:
+                mock_run.return_value = Mock(returncode=0)
+                runner.should_display(slideshow_context)
+
+                env_passed = mock_run.call_args[1]['env']
+                assert 'QSS_IMG_IDX' in env_passed
+                assert 'QSS_FULL_PATH' in env_passed
+                assert 'QSS_IMG_NAME' in env_passed
+
+
+class TestPostScriptRunner:
+    """Test post-tool hook script runner."""
+
+    def test_post_hook_receives_tool_info(self, slideshow_context):
+        """Test that post script receives tool execution details."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script = Path(tmpdir) / "post.sh"
+            script.write_text("#!/bin/bash\nexit 0\n")
+            script.chmod(0o755)
+
+            runner = PostScriptRunner(script)
+            with patch('subprocess.run') as mock_run:
+                mock_run.return_value = Mock(returncode=0)
+                runner.run_post_hook(
+                    slideshow_context,
+                    tool_id="3", tool_rc=0,
+                    tool_stdout="output", tool_stderr="",
+                    prev_full_path="/old/path.jpg", prev_img_name="path.jpg",
+                    img_removed=False
+                )
+
+                env_passed = mock_run.call_args[1]['env']
+                assert env_passed['QSS_TOOL_ID'] == '3'
+                assert env_passed['QSS_TOOL_RC'] == '0'
+                assert env_passed['QSS_TOOL_STDOUT'] == 'output'
+                assert env_passed['QSS_TOOL_STDERR'] == ''
+
+    def test_post_hook_receives_prev_state(self, slideshow_context):
+        """Test that post script receives pre-tool image state."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script = Path(tmpdir) / "post.sh"
+            script.write_text("#!/bin/bash\nexit 0\n")
+            script.chmod(0o755)
+
+            runner = PostScriptRunner(script)
+            with patch('subprocess.run') as mock_run:
+                mock_run.return_value = Mock(returncode=0)
+                runner.run_post_hook(
+                    slideshow_context,
+                    tool_id="1", tool_rc=0,
+                    tool_stdout="", tool_stderr="",
+                    prev_full_path="/photos/cat.jpg", prev_img_name="cat.jpg",
+                    img_removed=False
+                )
+
+                env_passed = mock_run.call_args[1]['env']
+                assert env_passed['QSS_PREV_FULL_PATH'] == '/photos/cat.jpg'
+                assert env_passed['QSS_PREV_IMG_NAME'] == 'cat.jpg'
+
+    def test_post_hook_img_removed_flag(self, slideshow_context):
+        """Test QSS_IMG_REMOVED is set when tool returns 1."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            script = Path(tmpdir) / "post.sh"
+            script.write_text("#!/bin/bash\nexit 0\n")
+            script.chmod(0o755)
+
+            runner = PostScriptRunner(script)
+            with patch('subprocess.run') as mock_run:
+                mock_run.return_value = Mock(returncode=0)
+
+                # When image was removed
+                runner.run_post_hook(
+                    slideshow_context,
+                    tool_id="1", tool_rc=1,
+                    tool_stdout="", tool_stderr="",
+                    prev_full_path="/p.jpg", prev_img_name="p.jpg",
+                    img_removed=True
+                )
+                env_passed = mock_run.call_args[1]['env']
+                assert env_passed['QSS_IMG_REMOVED'] == '1'
+
+                # When image was NOT removed
+                runner.run_post_hook(
+                    slideshow_context,
+                    tool_id="1", tool_rc=0,
+                    tool_stdout="", tool_stderr="",
+                    prev_full_path="/p.jpg", prev_img_name="p.jpg",
+                    img_removed=False
+                )
+                env_passed = mock_run.call_args[1]['env']
+                assert env_passed['QSS_IMG_REMOVED'] == ''
+
+    def test_post_hook_error_does_not_crash(self, slideshow_context):
+        """Test that post script errors don't propagate."""
+        runner = PostScriptRunner(Path("/nonexistent/post.sh"))
+        # Should not raise
+        runner.run_post_hook(
+            slideshow_context,
+            tool_id="1", tool_rc=0,
+            tool_stdout="", tool_stderr="",
+            prev_full_path="/p.jpg", prev_img_name="p.jpg",
+            img_removed=False
+        )
+
+
+class TestFilterIntegration:
+    """Test filter script integration with navigation actions."""
+
+    def test_navigate_next_skips_filtered(self, slideshow_context):
+        """Test that navigation skips images rejected by filter."""
+        call_count = [0]
+
+        def mock_should_display(ctx):
+            # Reject image at index 1, allow all others
+            return ctx.current_index != 1
+
+        runner = FilterScriptRunner(Path("/dummy"))
+        runner.should_display = mock_should_display
+        slideshow_context.filter_runner = runner
+        slideshow_context.current_index = 0
+
+        action = NavigateNextAction()
+        result = action.execute(slideshow_context)
+
+        # Should skip index 1 and land on index 2
+        assert slideshow_context.current_index == 2
+
+    def test_navigate_previous_skips_filtered(self, slideshow_context):
+        """Test that backward navigation skips filtered images."""
+        def mock_should_display(ctx):
+            return ctx.current_index != 1
+
+        runner = FilterScriptRunner(Path("/dummy"))
+        runner.should_display = mock_should_display
+        slideshow_context.filter_runner = runner
+        slideshow_context.current_index = 2
+
+        action = NavigatePreviousAction()
+        result = action.execute(slideshow_context)
+
+        # Should skip index 1 and land on index 0
+        assert slideshow_context.current_index == 0
+
+    def test_all_images_filtered_shows_anyway(self, slideshow_context):
+        """Test loop protection: if all images filtered, still shows one."""
+        def mock_should_display(ctx):
+            return False  # reject everything
+
+        runner = FilterScriptRunner(Path("/dummy"))
+        runner.should_display = mock_should_display
+        slideshow_context.filter_runner = runner
+        slideshow_context.current_index = 0
+
+        action = NavigateNextAction()
+        result = action.execute(slideshow_context)
+
+        # Should not hang; index should be some valid value
+        assert 0 <= slideshow_context.current_index < len(slideshow_context.image_paths)
+
+    def test_no_filter_no_change(self, slideshow_context):
+        """Test that navigation works normally without filter_runner."""
+        slideshow_context.filter_runner = None
+        slideshow_context.current_index = 0
+
+        action = NavigateNextAction()
+        result = action.execute(slideshow_context)
+
+        assert slideshow_context.current_index == 1
+
+
+class TestPostScriptIntegration:
+    """Test post script integration with external tool execution."""
+
+    def test_external_tool_triggers_post_hook(self, slideshow_context):
+        """Test that running an external tool triggers the post script."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            # Create a tool that exits 0
+            tool_path = tmpdir / "tool_1.sh"
+            tool_path.write_text("#!/bin/bash\necho 'done'\nexit 0\n")
+            tool_path.chmod(0o755)
+
+            # Create a mock post runner
+            post_runner = Mock()
+            slideshow_context.post_runner = post_runner
+
+            action = ExternalToolAction(tool_id="1", tool_path=tool_path)
+            action.execute(slideshow_context)
+
+            # Post runner should have been called
+            post_runner.run_post_hook.assert_called_once()
+            call_kwargs = post_runner.run_post_hook.call_args[1]
+            assert call_kwargs['tool_id'] == '1'
+            assert call_kwargs['tool_rc'] == 0
+            assert call_kwargs['img_removed'] is False
+
+    def test_external_tool_remove_triggers_post_hook(self, slideshow_context):
+        """Test post hook called with img_removed=True when tool returns 1."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            # Create a tool that exits 1 (remove image)
+            tool_path = tmpdir / "tool_1.sh"
+            tool_path.write_text("#!/bin/bash\nexit 1\n")
+            tool_path.chmod(0o755)
+
+            post_runner = Mock()
+            slideshow_context.post_runner = post_runner
+            slideshow_context.current_index = 2
+            prev_name = slideshow_context.image_paths[2].name
+
+            action = ExternalToolAction(tool_id="1", tool_path=tool_path)
+            action.execute(slideshow_context)
+
+            post_runner.run_post_hook.assert_called_once()
+            call_kwargs = post_runner.run_post_hook.call_args[1]
+            assert call_kwargs['tool_rc'] == 1
+            assert call_kwargs['img_removed'] is True
+            assert call_kwargs['prev_img_name'] == prev_name

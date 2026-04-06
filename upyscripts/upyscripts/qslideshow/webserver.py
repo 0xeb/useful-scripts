@@ -24,7 +24,7 @@ except ImportError:
 
 from .core import SlideshowContext
 from .config import ConfigManager
-from .actions import action_registry, ExternalToolManager
+from .actions import action_registry, ExternalToolManager, FilterScriptRunner, PostScriptRunner
 from .hotkeys import HotkeyManager, WebHotkeyAdapter
 from .gestures import GestureManager
 from .history import ActionHistory, UndoAction, RedoAction
@@ -841,6 +841,18 @@ class WebSlideshow:
         # Initialize action system components
         self._initialize_action_system()
 
+        # Script hooks (filter and post)
+        self._filter_runner = None
+        self._post_runner = None
+        filter_script = self.config.get('external_tools.filter_script')
+        if filter_script:
+            self._filter_runner = FilterScriptRunner(Path(filter_script))
+            print(f"Filter script: {filter_script}")
+        post_script = self.config.get('external_tools.post_script')
+        if post_script:
+            self._post_runner = PostScriptRunner(Path(post_script))
+            print(f"Post script: {post_script}")
+
         # Apply shuffle to the main list if requested
         if self.config.get('slideshow.shuffle', False):
             random.shuffle(self.image_paths)
@@ -891,6 +903,9 @@ class WebSlideshow:
         session.current_index = 0  # Each client starts at image 0
         # Set current_image to None as we don't load images in web mode
         session.current_image = None
+        # Attach script hooks (shared across sessions)
+        session.filter_runner = self._filter_runner
+        session.post_runner = self._post_runner
         # Per-session order (list of indices into self.image_paths)
         n = len(self.image_paths)
         session.image_order = list(range(n))

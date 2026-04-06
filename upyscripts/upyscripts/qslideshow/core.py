@@ -93,6 +93,10 @@ class SlideshowContext:
         self.gallery_grid = gallery_grid  # (rows, cols) tuple or None for auto/responsive
         self.gallery_thumbnail_size = gallery_thumbnail_size  # (width, height) tuple
 
+        # Script hooks (set after construction by GUI/web init)
+        self.filter_runner = None  # FilterScriptRunner instance or None
+        self.post_runner = None    # PostScriptRunner instance or None
+
         # Runtime state
         self.is_paused = paused
         self.repeat_count = 0
