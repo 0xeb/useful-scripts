@@ -236,6 +236,44 @@ upy.qslideshow @playlist.txt --repeat --status "$i/$n - $f"
 # vacation/*.jpg
 ```
 
+### rrepl
+HTTP JSON Python REPL server with named persistent sessions and lightweight clients.
+
+```bash
+# Start the server. It binds to 0.0.0.0 by default.
+upy.rrepl serve --port 8765
+
+# Execute code in the default session
+upy.rrepl exec "x = 41"
+upy.rrepl exec "print(x + 1)"
+
+# Use an isolated named session
+upy.rrepl exec "name = 'Ada'" --session demo
+upy.rrepl exec "print(name)" --session demo
+
+# Read code from a file or stdin
+upy.rrepl exec --file script.py --session demo
+printf 'print("hello")\n' | upy.rrepl exec
+
+# Manage sessions
+upy.rrepl sessions
+upy.rrepl reset --session demo
+upy.rrepl delete demo
+```
+
+Python client:
+
+```python
+from upyscripts.rrepl.client import RReplClient
+
+client = RReplClient("http://127.0.0.1:8765")
+client.exec("x = 1", session="demo")
+result = client.exec("print(x)", session="demo")
+print(result["stdout"])
+```
+
+Warning: `rrepl` executes arbitrary Python code on the server process. Only run it on trusted networks.
+
 ### dlcalc.py
 Calculate and visualize daylight hours and sunset times for any location worldwide with built-in city database and automatic geocoding support.
 

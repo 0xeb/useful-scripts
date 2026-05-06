@@ -69,6 +69,7 @@ dev = [
 "upy.pyast" = "upyscripts.pyast:main"
 "upy.src2llm" = "upyscripts.src_to_llm_context:main"
 "upy.qslideshow" = "upyscripts.qslideshow.cli:main"
+"upy.rrepl" = "upyscripts.rrepl.cli:main"
 "upy.dll2proj" = "upyscripts.dll2proj.dll2proj:main"
 "upy.dlcalc" = "upyscripts.dlcalc:main"
 "upy.mksctxt" = "upyscripts.mksctxt:main"
