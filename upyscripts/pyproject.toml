@@ -52,6 +52,10 @@ dev = [
     "flake8",
     "mypy",
 ]
+rrepl-dbg = [
+    "capstone>=5.0",
+    "keystone-engine>=0.9",
+]
 
 [project.scripts]
 "upy.applydiff" = "upyscripts.applydiff:main"
@@ -70,10 +74,14 @@ dev = [
 "upy.src2llm" = "upyscripts.src_to_llm_context:main"
 "upy.qslideshow" = "upyscripts.qslideshow.cli:main"
 "upy.rrepl" = "upyscripts.rrepl.cli:main"
+"upy.rrepl-dbg" = "upyscripts.rrepl.plugins.dbg.cli:main"
 "upy.dll2proj" = "upyscripts.dll2proj.dll2proj:main"
 "upy.dlcalc" = "upyscripts.dlcalc:main"
 "upy.mksctxt" = "upyscripts.mksctxt:main"
 "upy.help" = "upyscripts.help_command:main"
+
+[project.entry-points."upy.rrepl.plugins"]
+dbg = "upyscripts.rrepl.plugins.dbg"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/upyscripts"
@@ -83,3 +91,10 @@ Issues = "https://github.com/yourusername/upyscripts/issues"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["upyscripts*"]
+
+[tool.setuptools.package-data]
+# Ship the runtime-read docs inside wheels. Dbg.guide() / MANIFEST["guide"]
+# read GUIDE.md at runtime; without this, non-editable installs would hit
+# FileNotFoundError.
+"upyscripts.rrepl.plugins.dbg" = ["GUIDE.md"]
+"upyscripts.rrepl" = ["AGENT-GUIDE.md", "README.md"]

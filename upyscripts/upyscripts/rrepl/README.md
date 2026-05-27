@@ -7,6 +7,11 @@ reuse the same interpreter namespace later.
 Warning: this server executes arbitrary Python code. It binds to `0.0.0.0` by
 default for LAN use, so only run it on trusted networks.
 
+> **Driving rrepl from an AI / LLM agent?** Read
+> [`AGENT-GUIDE.md`](AGENT-GUIDE.md) — bootstrap, worked example, and
+> session hygiene targeted at programmatic clients. The dbg plugin's
+> reference lives in [`plugins/dbg/GUIDE.md`](plugins/dbg/GUIDE.md).
+
 ## CLI
 
 ```bash

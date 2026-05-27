@@ -177,7 +177,140 @@ def create_app(manager=None):
         existed = repl_manager.delete(session)
         return jsonify({"ok": True, "session": session, "deleted": existed})
 
+    @app.route(API_PREFIX + "/reload", methods=["POST"])
+    def reload_modules():
+        """Drop a set of import-name prefixes from sys.modules, re-run any
+        editable-install finders, invalidate import caches, and (by default)
+        reset all rrepl sessions so any cached references to old classes
+        are dropped. The running rrepl server module itself is preserved.
+
+        Body (all optional):
+            {"prefixes": ["upyscripts.rrepl.plugins"],   # default
+             "reset_sessions": true,                      # default
+             "reinstall_finders": true}                   # default
+
+        This is the deploy-loop entry point: run `git pull` (or rsync)
+        against the source repo, then POST /api/v1/reload to pick up the
+        new code without restarting the rrepl process.
+        """
+        # A truly absent body (no bytes) means "default reload". ANY bytes
+        # present — including whitespace-only, which is not valid JSON —
+        # must parse to a JSON object, else 400. We must NOT silently
+        # coerce [] / false / "" / "   " / malformed JSON to {} and then
+        # perform a default reload (which drops modules + resets sessions)
+        # on a bad request.
+        if request.data:
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict):
+                return jsonify(validation_error("request body must be a JSON object")), 400
+        else:
+            data = {}
+
+        prefixes = data.get("prefixes", ["upyscripts.rrepl.plugins"])
+        if not isinstance(prefixes, list) or not all(isinstance(p, str) for p in prefixes):
+            return jsonify(validation_error("prefixes must be a list of strings")), 400
+        reset_sessions = bool(data.get("reset_sessions", True))
+        reinstall_finders = bool(data.get("reinstall_finders", True))
+
+        result = _do_reload(repl_manager, prefixes, reset_sessions, reinstall_finders)
+        return jsonify(result)
+
     return app
+
+
+def _do_reload(repl_manager, prefixes, reset_sessions, reinstall_finders):
+    import importlib
+    import sys
+
+    # Never drop the rrepl server itself — we are running inside it.
+    PROTECTED = {
+        "upyscripts.rrepl",
+        "upyscripts.rrepl.server",
+        "upyscripts.rrepl.protocol",
+        "upyscripts.rrepl.cli",
+        "upyscripts.rrepl.client",
+        "upyscripts",  # parent — re-imports cheap
+    }
+    targets = []
+    for name in list(sys.modules):
+        if name in PROTECTED:
+            continue
+        for p in prefixes:
+            if name == p or name.startswith(p + "."):
+                targets.append(name)
+                break
+    for name in targets:
+        del sys.modules[name]
+
+    finders_installed = []
+    if reinstall_finders:
+        # Drop any currently-loaded editable finders so the next import
+        # re-resolves through the freshly-evaluated .pth-installed finders.
+        for name in list(sys.modules):
+            if name.startswith("__editable__") and name.endswith("_finder"):
+                del sys.modules[name]
+        for finder_mod in _discover_editable_finders():
+            try:
+                m = importlib.import_module(finder_mod)
+                if hasattr(m, "install"):
+                    m.install()
+                    finders_installed.append(finder_mod)
+            except ImportError:
+                pass
+
+    importlib.invalidate_caches()
+
+    sessions_reset = 0
+    if reset_sessions and repl_manager is not None:
+        for name in list(repl_manager.list_sessions()):
+            repl_manager.reset(name)
+            sessions_reset += 1
+
+    return {
+        "ok": True,
+        "dropped": sorted(targets),
+        "finders_installed": finders_installed,
+        "sessions_reset": sessions_reset,
+    }
+
+
+def _discover_editable_finders():
+    """Walk every directory pip might install into and yield any
+    ``__editable___*_finder`` module names found there. Each match is the
+    importable module name (no .py suffix). Survives package version bumps
+    because we're matching the file pattern, not a hardcoded version."""
+    import glob
+    import os
+    import site
+
+    seen = set()
+    candidates = []
+    try:
+        candidates.extend(site.getsitepackages())
+    except Exception:
+        pass
+    try:
+        user = site.getusersitepackages()
+        if user:
+            candidates.append(user)
+    except Exception:
+        pass
+    # Also honour anything explicitly on sys.path that looks like a
+    # site-packages dir; covers virtualenv layouts where getsitepackages
+    # may not include all relevant directories on every platform.
+    import sys as _sys
+    for p in _sys.path:
+        if p and "site-packages" in p:
+            candidates.append(p)
+
+    for d in candidates:
+        if not d or not os.path.isdir(d):
+            continue
+        for hit in glob.glob(os.path.join(d, "__editable___*_finder.py")):
+            mod_name = os.path.splitext(os.path.basename(hit))[0]
+            if mod_name not in seen:
+                seen.add(mod_name)
+                yield mod_name
 
 
 def run_server(host=DEFAULT_HOST, port=DEFAULT_PORT, debug=False):

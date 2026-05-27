@@ -3,3 +3,4 @@ _plan/
 *.pyc
 __pycache__/
 upyscripts.egg-info/
+.claude/

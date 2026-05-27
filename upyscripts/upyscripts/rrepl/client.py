@@ -84,3 +84,13 @@ class RReplClient:
             "DELETE",
             API_PREFIX + "/sessions/" + quote(session, safe=""),
         )
+
+    def reload(self, prefixes=None, reset_sessions=True,
+               reinstall_finders=True):
+        body = {
+            "reset_sessions": bool(reset_sessions),
+            "reinstall_finders": bool(reinstall_finders),
+        }
+        if prefixes is not None:
+            body["prefixes"] = list(prefixes)
+        return self._request("POST", API_PREFIX + "/reload", json=body)

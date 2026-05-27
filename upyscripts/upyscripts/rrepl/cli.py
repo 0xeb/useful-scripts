@@ -85,6 +85,24 @@ def delete_command(args):
     return 0
 
 
+def reload_command(args):
+    payload = _client(args).reload(
+        prefixes=args.prefix or None,
+        reset_sessions=not args.keep_sessions,
+        reinstall_finders=not args.no_finder,
+    )
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        dropped = payload.get("dropped", [])
+        print("dropped {} module(s); reset {} session(s); finders: {}".format(
+            len(dropped),
+            payload.get("sessions_reset", 0),
+            ", ".join(payload.get("finders_installed", [])) or "none",
+        ))
+    return 0
+
+
 def add_client_options(parser):
     parser.add_argument("--url", default="http://127.0.0.1:8765", help="rrepl server URL")
     parser.add_argument("--timeout", type=float, default=30, help="HTTP timeout in seconds")
@@ -137,6 +155,26 @@ Examples:
     add_client_options(delete)
     delete.add_argument("session", help="session name")
     delete.set_defaults(func=delete_command)
+
+    reload_p = subparsers.add_parser(
+        "reload",
+        help="hot-reload Python modules inside the running rrepl server",
+    )
+    add_client_options(reload_p)
+    reload_p.add_argument(
+        "--prefix", action="append",
+        help=("import-name prefix to drop from sys.modules; may be passed "
+              "multiple times. Default: upyscripts.rrepl.plugins"),
+    )
+    reload_p.add_argument(
+        "--keep-sessions", action="store_true",
+        help="do not reset rrepl sessions (cached classes may stay stale)",
+    )
+    reload_p.add_argument(
+        "--no-finder", action="store_true",
+        help="skip re-running editable-install finders",
+    )
+    reload_p.set_defaults(func=reload_command)
 
     return parser
 
