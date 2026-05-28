@@ -83,8 +83,15 @@ def upload_file():
 
 def main():
     """Main entry point for the file upload server."""
+    import sys
+    print(
+        "NOTE: upy.file_upload is deprecated. "
+        "Use upy.file_serve instead -- it supports both uploads and downloads.\n"
+        "  Example: upy.file_serve --help\n",
+        file=sys.stderr,
+    )
     import argparse
-    parser = argparse.ArgumentParser(description='Simple file upload server')
+    parser = argparse.ArgumentParser(description='Simple file upload server (deprecated: use upy.file_serve)')
     parser.add_argument('--port', type=int, default=DEFAULT_PORT, help=f'Port to run the server on (default: {DEFAULT_PORT})')
     parser.add_argument('--host', default='0.0.0.0', help='Host to bind to (default: 0.0.0.0)')
     parser.add_argument('--upload-dir', default='./uploads', help='Directory to store uploaded files (default: ./uploads)')
