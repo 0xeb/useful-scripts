@@ -330,35 +330,33 @@ class ImageSlideshow:
             self.context.current_image.close()
             self.context.current_image = None
 
-        path = self.context.current_path
-        if path is None:
-            return
+        while self.context.image_paths:
+            path = self.context.current_path
+            if path is None:
+                return
 
-        image = self.load_image(path)
+            image = self.load_image(path)
+            if image is not None:
+                break
 
-        if image is None:
             # Remove failed image from list to avoid retrying
             print(f"Removing failed image from list: {path}")
             self.context.image_paths.pop(self.context.current_index)
 
             # Check if we have any images left
-            if len(self.context.image_paths) == 0:
+            if not self.context.image_paths:
                 print("No more valid images to display.")
                 self.quit()
                 return
 
             # Adjust current index if we removed the last image
             if self.context.current_index >= len(self.context.image_paths):
-                if self.context.repeat and len(self.context.image_paths) > 0:
+                if self.context.repeat:
                     self.context.current_index = 0
                 else:
                     print("Reached end of image list.")
                     self.quit()
                     return
-
-            # Try next image
-            self.display_current_image()
-            return
 
         self.context.current_image = image
 
