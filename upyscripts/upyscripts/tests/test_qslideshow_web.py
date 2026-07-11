@@ -244,8 +244,8 @@ class TestSessionIndependence:
         r1 = requests.get(f"{base_url}/api/status", headers={"X-Session-ID": "s1"})
         r2 = requests.get(f"{base_url}/api/status", headers={"X-Session-ID": "s2"})
 
-        assert r1.json()["is_paused"] == True
-        assert r2.json()["is_paused"] == False
+        assert r1.json()["is_paused"]
+        assert not r2.json()["is_paused"]
 
 
 class TestPasswordAuthentication:
@@ -271,7 +271,7 @@ class TestPasswordAuthentication:
             json={"password": "wrong_password"}
         )
         assert r.status_code == 401
-        assert r.json()["success"] == False
+        assert not r.json()["success"]
         assert "error" in r.json()
 
     def test_correct_password_accepted(self, web_server_with_password):
@@ -284,7 +284,7 @@ class TestPasswordAuthentication:
             json={"password": "test123"}
         )
         assert r.status_code == 200
-        assert r.json()["success"] == True
+        assert r.json()["success"]
         assert "auth_session" in r.cookies
 
     def test_authenticated_api_access_works(self, web_server_with_password):
@@ -435,7 +435,7 @@ class TestAPIEndpoints:
         )
         assert r.status_code == 200
         data = r.json()
-        assert data["success"] == True
+        assert data["success"]
         assert data["current_index"] == 1
 
     def test_api_execute_toggle_pause(self, web_server):
@@ -450,8 +450,8 @@ class TestAPIEndpoints:
         )
         assert r.status_code == 200
         data = r.json()
-        assert data["success"] == True
-        assert data["is_paused"] == True
+        assert data["success"]
+        assert data["is_paused"]
 
 
 class TestHTMLPages:
@@ -509,7 +509,7 @@ class TestShuffleMode:
             headers={"X-Session-ID": "test"}
         )
         assert r.status_code == 200
-        assert r.json()["shuffle"] == True
+        assert r.json()["shuffle"]
 
     def test_sessions_get_valid_shuffle_orders(self, web_server_shuffle):
         """Test that each session gets a valid independently-created order."""
@@ -542,7 +542,7 @@ class TestShuffleMode:
             headers={"X-Session-ID": "test"}
         )
         assert r.status_code == 200
-        assert r.json()["shuffle"] == True
+        assert r.json()["shuffle"]
 
         # Get new image order
         r = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "test"})
@@ -575,7 +575,7 @@ class TestShuffleMode:
             headers={"X-Session-ID": "s1"}
         )
         assert r.status_code == 200
-        assert r.json()["shuffle"] == False
+        assert not r.json()["shuffle"]
 
         # Toggle shuffle off in session 2
         r = requests.post(
@@ -584,7 +584,7 @@ class TestShuffleMode:
             headers={"X-Session-ID": "s2"}
         )
         assert r.status_code == 200
-        assert r.json()["shuffle"] == False
+        assert not r.json()["shuffle"]
 
         # Now both should have the same order (sequential indices into server's list)
         r1 = requests.get(f"{base_url}/api/images", headers={"X-Session-ID": "s1"})

@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from upyscripts.qslideshow.cli import parse_arguments
 from upyscripts.qslideshow.config import ConfigManager

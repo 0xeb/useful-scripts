@@ -45,7 +45,7 @@ def validate_mode(data: Any, args: argparse.Namespace) -> None:
     print("Valid JSON")
     if args.verbose:
         stats = get_json_stats(data)
-        print(f"Statistics:")
+        print("Statistics:")
         print(f"  Type: {stats['type']}")
         print(f"  Size: {stats['size']}")
         if stats['type'] == 'object':

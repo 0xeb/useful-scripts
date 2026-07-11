@@ -5,7 +5,7 @@ Maps touch/mouse gestures to action names.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Dict, Optional, List, Tuple
+from typing import TYPE_CHECKING, Dict, Optional, List
 from .config import ConfigManager
 from .actions import action_registry
 import time

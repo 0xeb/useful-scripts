@@ -296,7 +296,7 @@ class TestHotkeyHandleKeyEvent:
 
         assert result is not None
         assert 'is_paused' in result
-        assert slideshow_context.is_paused == True
+        assert slideshow_context.is_paused
 
     def test_handle_key_with_modifiers(self, config_with_modifiers, slideshow_context):
         """Test key event with modifiers."""

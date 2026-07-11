@@ -6,14 +6,12 @@ Provides a unified way to define and execute actions across GUI and Web interfac
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, Optional, List, Callable
+from typing import TYPE_CHECKING, Any, Dict, Optional, List
 from enum import Enum
 from pathlib import Path
 import os
 import subprocess
 import platform
-import shutil
-import json
 import random
 from datetime import datetime
 

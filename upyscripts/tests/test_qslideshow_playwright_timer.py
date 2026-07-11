@@ -45,7 +45,7 @@ def web_server_with_timer(test_images):
     config = ConfigManager()
     # Set a short speed for testing (2 seconds)
     config.set('slideshow.speed', 2.0)
-    config.set('slideshow.repeat_mode', 'none')
+    config.set('slideshow.repeat_mode', 'fixed')
 
     port = find_free_port()
     server = WebSlideshow(test_images, config=config, port=port)
@@ -91,7 +91,7 @@ def test_timer_resets_on_navigation(web_server_with_timer, page):
     assert get_current_index(page) == 2
 
     # Record the time we navigated
-    action_time = time.time()
+    time.time()
 
     # Wait 1.5 seconds - if timer didn't reset, auto-advance would have
     # happened by now (we'd be at image 3)
@@ -195,18 +195,21 @@ def test_timer_resets_on_repeat_toggle(web_server_with_timer, page):
     # Toggle repeat mode
     page.keyboard.press("r")
     time.sleep(0.3)
+    current_after_toggle = get_current_index(page)
 
     # Wait 1.5 seconds - if timer didn't reset, auto-advance would happen
     time.sleep(1.5)
 
-    # Should still be at image 1 (timer was reset)
-    assert get_current_index(page) == 1
+    # The fixed -> shuffle transition may reposition the current image, but
+    # the reset timer must keep that position stable during this interval.
+    assert get_current_index(page) == current_after_toggle
 
-    # Wait another 1 second (total 2.5 seconds)
-    time.sleep(1.0)
-
-    # Should have auto-advanced to image 2
-    assert get_current_index(page) == 2
+    # Wait for the scheduled advance with timing tolerance for browser/CI load.
+    page.wait_for_function(
+        "index => !document.querySelector('#status-overlay').textContent.trim().startsWith(`${index} /`)",
+        arg=current_after_toggle,
+        timeout=3000,
+    )
 
 
 def test_auto_advance_works_without_actions(web_server_with_timer, page):

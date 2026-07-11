@@ -98,6 +98,9 @@ def test_playwright_cycles_repeat_modes(web_server, page):
     page.goto(web_server['url'])
     status = page.locator('#status-overlay')
     status.wait_for()
+    page.wait_for_function(
+        "() => document.querySelector('#status-overlay').textContent.includes('1 / 3')"
+    )
 
     expected_modes = ['fixed', 'shuffle', 'shuffle-each']
     for mode in expected_modes:

@@ -125,7 +125,7 @@ def generate_markdown(files, base_path, output_file, skip_binary=True, max_size=
 
             # Check if binary
             if skip_binary and is_binary_file(file_path):
-                md_file.write(f"**File skipped:** Binary file detected\n\n")
+                md_file.write("**File skipped:** Binary file detected\n\n")
                 skipped_files.append((rel_path, "binary"))
                 continue
 
@@ -136,7 +136,7 @@ def generate_markdown(files, base_path, output_file, skip_binary=True, max_size=
                     content = f.read()
                     md_file.write(f"```{language}\n{content}\n```\n\n")
             except UnicodeDecodeError:
-                md_file.write(f"**Error reading file:** Unable to decode as UTF-8 text\n\n")
+                md_file.write("**Error reading file:** Unable to decode as UTF-8 text\n\n")
                 skipped_files.append((rel_path, "decode error"))
             except Exception as e:
                 md_file.write(f"**Error reading file:** {e}\n\n")

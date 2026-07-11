@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from unittest.mock import Mock, patch
+from PIL import Image
 
 from upyscripts.qslideshow.core import SlideshowContext
 from upyscripts.qslideshow.gui import ImageSlideshow
@@ -91,6 +92,18 @@ def test_all_invalid_images_quit_once():
 
     assert slideshow.context.image_paths == []
     slideshow.quit.assert_called_once_with()
+
+
+def test_load_image_labels_unidentified_files(tmp_path, capsys):
+    path = tmp_path / 'corrupt.png'
+    path.write_text('not an image', encoding='utf-8')
+    slideshow = ImageSlideshow.__new__(ImageSlideshow)
+
+    with patch('upyscripts.qslideshow.gui.Image', Image):
+        result = slideshow.load_image(path)
+
+    assert result is None
+    assert capsys.readouterr().out == f'Not a valid image file: {path}\n'
 
 
 def test_gui_uses_configured_geometry_and_background(tmp_path):

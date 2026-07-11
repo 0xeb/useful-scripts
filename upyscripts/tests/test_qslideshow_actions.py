@@ -16,7 +16,7 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
-from unittest.mock import Mock, patch, call
+from unittest.mock import Mock, patch
 from PIL import Image
 
 from upyscripts.qslideshow.core import SlideshowContext
@@ -187,24 +187,24 @@ class TestControlActions:
     def test_toggle_pause(self, slideshow_context):
         """Test pause toggle."""
         action = TogglePauseAction()
-        assert slideshow_context.is_paused == False
+        assert not slideshow_context.is_paused
 
         result = action.execute(slideshow_context)
-        assert result["is_paused"] == True
-        assert slideshow_context.is_paused == True
+        assert result["is_paused"]
+        assert slideshow_context.is_paused
 
         result = action.execute(slideshow_context)
-        assert result["is_paused"] == False
-        assert slideshow_context.is_paused == False
+        assert not result["is_paused"]
+        assert not slideshow_context.is_paused
 
     def test_toggle_repeat(self, slideshow_context):
         """Test repeat toggle."""
         action = ToggleRepeatAction()
-        assert slideshow_context.repeat == False
+        assert not slideshow_context.repeat
 
         result = action.execute(slideshow_context)
-        assert result["repeat"] == True
-        assert slideshow_context.repeat == True
+        assert result["repeat"]
+        assert slideshow_context.repeat
 
     def test_toggle_repeat_cycles_authoritative_modes(self, slideshow_context):
         action = ToggleRepeatAction()
@@ -224,34 +224,34 @@ class TestControlActions:
         original_paths = slideshow_context.image_paths.copy()
 
         result = action.execute(slideshow_context)
-        assert result["shuffle"] == True
-        assert slideshow_context.shuffle == True
+        assert result["shuffle"]
+        assert slideshow_context.shuffle
         # Paths might be shuffled (not guaranteed to be different with small list)
         assert set(slideshow_context.image_paths) == set(original_paths)
 
         # Toggle off restores original order
         result = action.execute(slideshow_context)
-        assert result["shuffle"] == False
+        assert not result["shuffle"]
         assert slideshow_context.image_paths == original_paths
 
     def test_toggle_shuffle_web_mode(self, web_slideshow_context):
         """Test shuffle in web mode manipulates image_order."""
         action = ToggleShuffleAction()
-        original_order = web_slideshow_context.image_order.copy()
+        web_slideshow_context.image_order.copy()
         web_slideshow_context.current_index = 2
 
         # Get current image
-        current_image_idx = web_slideshow_context.image_order[2]
+        web_slideshow_context.image_order[2]
 
         result = action.execute(web_slideshow_context)
-        assert result["shuffle"] == True
-        assert web_slideshow_context.shuffle == True
+        assert result["shuffle"]
+        assert web_slideshow_context.shuffle
         # Current index should update to where the image moved
         assert "current_index" in result
 
         # Toggle off restores sequential order
         result = action.execute(web_slideshow_context)
-        assert result["shuffle"] == False
+        assert not result["shuffle"]
         assert web_slideshow_context.image_order == list(range(5))
 
     def test_toggle_fullscreen(self, slideshow_context):
@@ -259,20 +259,20 @@ class TestControlActions:
         action = ToggleFullscreenAction()
 
         result = action.execute(slideshow_context, is_fullscreen=False)
-        assert result["is_fullscreen"] == True
+        assert result["is_fullscreen"]
         assert result["action"] == "toggle_fullscreen"
 
         result = action.execute(slideshow_context, is_fullscreen=True)
-        assert result["is_fullscreen"] == False
+        assert not result["is_fullscreen"]
 
     def test_toggle_always_on_top(self, slideshow_context):
         """Test always on top toggle."""
         action = ToggleAlwaysOnTopAction()
-        assert slideshow_context.always_on_top == False
+        assert not slideshow_context.always_on_top
 
         result = action.execute(slideshow_context)
-        assert result["always_on_top"] == True
-        assert slideshow_context.always_on_top == True
+        assert result["always_on_top"]
+        assert slideshow_context.always_on_top
 
     def test_quit_action(self, slideshow_context):
         """Test quit action."""
@@ -430,7 +430,7 @@ class TestMemoryActions:
             notes_file = Path(tmpdir) / "notes.txt"
             action = NoteAction(notes_file=notes_file)
 
-            result = action.execute(slideshow_context, note_text="")
+            action.execute(slideshow_context, note_text="")
             assert notes_file.exists()
 
 
@@ -550,7 +550,7 @@ class TestExternalToolAction:
             action = ExternalToolAction(tool_id="1", tool_path=tool_path)
             result = action.execute(slideshow_context)
 
-            assert result["success"] == True
+            assert result["success"]
             assert result["tool"] == "1"
 
     def test_external_tool_execution_remove_image(self, slideshow_context):
@@ -802,7 +802,6 @@ class TestFilterIntegration:
 
     def test_navigate_next_skips_filtered(self, slideshow_context):
         """Test that navigation skips images rejected by filter."""
-        call_count = [0]
 
         def mock_should_display(ctx):
             # Reject image at index 1, allow all others
@@ -814,7 +813,7 @@ class TestFilterIntegration:
         slideshow_context.current_index = 0
 
         action = NavigateNextAction()
-        result = action.execute(slideshow_context)
+        action.execute(slideshow_context)
 
         # Should skip index 1 and land on index 2
         assert slideshow_context.current_index == 2
@@ -830,7 +829,7 @@ class TestFilterIntegration:
         slideshow_context.current_index = 2
 
         action = NavigatePreviousAction()
-        result = action.execute(slideshow_context)
+        action.execute(slideshow_context)
 
         # Should skip index 1 and land on index 0
         assert slideshow_context.current_index == 0
@@ -846,7 +845,7 @@ class TestFilterIntegration:
         slideshow_context.current_index = 0
 
         action = NavigateNextAction()
-        result = action.execute(slideshow_context)
+        action.execute(slideshow_context)
 
         # Should not hang; index should be some valid value
         assert 0 <= slideshow_context.current_index < len(slideshow_context.image_paths)
@@ -857,7 +856,7 @@ class TestFilterIntegration:
         slideshow_context.current_index = 0
 
         action = NavigateNextAction()
-        result = action.execute(slideshow_context)
+        action.execute(slideshow_context)
 
         assert slideshow_context.current_index == 1
 

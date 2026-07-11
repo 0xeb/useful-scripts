@@ -60,7 +60,7 @@ def geocode_location(location_str, enable_geocoding=True):
             time.sleep(1)
             
             return lat, lon, display_name
-    except Exception as e:
+    except Exception:
         # Silently fail and fall back to manual entry
         pass
     
@@ -148,7 +148,7 @@ def daylight_data(location, start_date, end_date, step_days=14):
         else:
             # No timezone specified, use system's local timezone
             tz = get_localzone()
-    except:
+    except Exception:
         tz = get_localzone()
     
     while date <= end_date:
@@ -203,7 +203,7 @@ def create_plot(dates, daylight_lengths, sunrise_times, sunset_times, location_n
     # Try to set window title (may not work in all backends)
     try:
         fig.canvas.manager.set_window_title(f'Daylight Calculator - {location_name}')
-    except:
+    except Exception:
         pass  # Some backends don't support window titles
     
     # Plot sunset times

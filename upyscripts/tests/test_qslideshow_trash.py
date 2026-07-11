@@ -1,6 +1,5 @@
 import json
 from datetime import datetime, timedelta
-from pathlib import Path
 
 from upyscripts.qslideshow.trash import TrashManager
 

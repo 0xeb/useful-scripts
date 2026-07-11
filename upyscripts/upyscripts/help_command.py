@@ -41,7 +41,7 @@ def get_command_description(module_path: str, command_name: str) -> str:
                     match = re.search(r"description=['\"]([^'\"]+)['\"]", source)
                     if match:
                         return match.group(1)
-            except:
+            except Exception:
                 pass
                 
     except Exception:

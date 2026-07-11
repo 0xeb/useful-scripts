@@ -5,10 +5,9 @@ GUI implementation for qslideshow using tkinter.
 
 import sys
 import os
-import random
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional
 
 from .core import SlideshowContext
 from .config import ConfigManager
@@ -269,7 +268,7 @@ class ImageSlideshow:
             elif action_name and action_name.startswith('external_tool_'):
                 # External tool was executed via action system
                 if result.get('action') == 'removed':
-                    print(f"Tool removed image from list")
+                    print("Tool removed image from list")
                     self.display_current_image()
             
             # Update display for navigation actions
@@ -300,11 +299,11 @@ class ImageSlideshow:
             _ = image.size
             return image
 
-        except (IOError, OSError) as e:
-            print(f"I/O error loading {path}: {e}")
-            return None
         except Image.UnidentifiedImageError:
             print(f"Not a valid image file: {path}")
+            return None
+        except (IOError, OSError) as e:
+            print(f"I/O error loading {path}: {e}")
             return None
         except Exception as e:
             print(f"Unexpected error loading {path}: {e}")

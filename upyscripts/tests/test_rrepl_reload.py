@@ -12,7 +12,6 @@ from __future__ import annotations
 import sys
 import types
 
-import pytest
 
 from upyscripts.rrepl.server import (
     ReplManager,

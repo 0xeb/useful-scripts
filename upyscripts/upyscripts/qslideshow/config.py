@@ -6,7 +6,7 @@ Handles loading and merging configuration from multiple sources.
 
 import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import os
 
 

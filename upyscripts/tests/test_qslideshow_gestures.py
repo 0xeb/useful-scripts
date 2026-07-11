@@ -13,8 +13,7 @@ Tests cover:
 """
 
 import pytest
-import time
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from upyscripts.qslideshow.gestures import GestureDetector, GestureManager
 from upyscripts.qslideshow.config import ConfigManager

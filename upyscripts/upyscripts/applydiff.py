@@ -4,7 +4,9 @@ Apply a DIFF file to a binary file.
 
 A DIFF file can be generated from IDA Pro for example or the output of "FC.EXE /B file1.bin file2.bin
 """
-import os, sys, re, getopt
+import os
+import sys
+import re
 
 # TODO:
 # -- make as an IDA plugin
@@ -17,13 +19,13 @@ def apply_diff(diff_file, bin_file, verify):
     # Get the binary file size
     try:
         bin_size = os.path.getsize(bin_file)
-    except:
+    except OSError:
         return (False, f"Binary file '{bin_file}' not found!")
 
     # Open the binary file for updates
     try:
         bf = open(bin_file, 'r+b')
-    except:
+    except OSError:
         return (False, f"Binary file '{bin_file}' could not be open for updates")
 
     # Compile the regular expression
@@ -32,7 +34,7 @@ def apply_diff(diff_file, bin_file, verify):
     # Open the diff file
     try:
         df = open(diff_file, 'r')
-    except:
+    except OSError:
         bf.close()
         return (False, f"Diff file '{diff_file}' could not be open for reading")
 
@@ -106,4 +108,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
    main()
-

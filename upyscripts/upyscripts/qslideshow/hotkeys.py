@@ -5,7 +5,7 @@ Maps keyboard inputs to action names.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Dict, List, Optional, Callable, Any
+from typing import TYPE_CHECKING, Dict, List, Optional
 from .config import ConfigManager
 from .actions import action_registry
 

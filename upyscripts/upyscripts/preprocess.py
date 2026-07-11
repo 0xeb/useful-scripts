@@ -1,4 +1,6 @@
-import re, copy, sys
+import re
+import copy
+import sys
 
 # Preprocess return
 PP_SKIP = 0
@@ -224,7 +226,7 @@ class preprocess_t(object):
             # Evaluate the condition
             result = bool(eval(condition, globals=globals(), locals=self.defines))
             return PP_OK if result else PP_SKIP
-        except:
+        except Exception:
             return PP_SKIP
 
 

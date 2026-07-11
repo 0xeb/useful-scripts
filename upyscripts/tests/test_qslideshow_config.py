@@ -16,7 +16,7 @@ import pytest
 import tempfile
 import yaml
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from upyscripts.qslideshow.config import ConfigManager
 
@@ -77,8 +77,8 @@ class TestConfigManagerInitialization:
         config = ConfigManager()
 
         assert config.get('slideshow.speed') == 3.0
-        assert config.get('slideshow.repeat') == False
-        assert config.get('slideshow.shuffle') == False
+        assert not config.get('slideshow.repeat')
+        assert not config.get('slideshow.shuffle')
         assert config.get('slideshow.fit_mode') == 'shrink'
 
     def test_default_web_settings(self):
@@ -87,7 +87,7 @@ class TestConfigManagerInitialization:
 
         assert config.get('web.port') == 8000
         assert config.get('web.host') == '0.0.0.0'
-        assert config.get('web.enable_wake_lock') == True
+        assert config.get('web.enable_wake_lock')
 
 
 class TestConfigFileDiscovery:
@@ -169,7 +169,7 @@ hotkeys:
         config.load_config(str(config_file))
 
         assert config.get('slideshow.speed') == 5.0
-        assert config.get('slideshow.repeat') == True
+        assert config.get('slideshow.repeat')
         assert config.get('hotkeys.common.toggle_pause') == 'p'
 
     def test_load_empty_file_uses_defaults(self, temp_config_dir):
@@ -258,7 +258,7 @@ class TestDeepMerge:
         result = config._deep_merge(base, overlay)
 
         assert result['slideshow']['speed'] == 5.0
-        assert result['slideshow']['repeat'] == False
+        assert not result['slideshow']['repeat']
 
     def test_merge_preserves_base(self):
         """Test that merge doesn't modify original base dict."""
@@ -382,11 +382,11 @@ class TestUpdateFromArgs:
         config.update_from_args(args)
 
         assert config.get('slideshow.speed') == 10.0
-        assert config.get('slideshow.repeat') == True
-        assert config.get('slideshow.shuffle') == True
+        assert config.get('slideshow.repeat')
+        assert config.get('slideshow.shuffle')
         assert config.get('slideshow.fit_mode') == 'original'
-        assert config.get('slideshow.always_on_top') == True
-        assert config.get('slideshow.paused_on_start') == True
+        assert config.get('slideshow.always_on_top')
+        assert config.get('slideshow.paused_on_start')
 
     def test_update_web_args(self):
         """Test updating web server arguments."""
@@ -400,7 +400,7 @@ class TestUpdateFromArgs:
 
         assert config.get('web.port') == 9000
         assert config.get('web.host') == '127.0.0.1'
-        assert config.get('web.dev_mode') == True
+        assert config.get('web.dev_mode')
 
     def test_update_ignores_none_values(self):
         """Test that None values are not applied."""

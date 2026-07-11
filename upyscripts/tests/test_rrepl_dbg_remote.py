@@ -623,7 +623,6 @@ def test_worker_thread_released_and_debuggee_killed_on_reset(
     """Dropping a session's DBG (here via reset) must stop its dbg-worker
     thread and kill the spawned debuggee — i.e. no thread/handle leak per
     session. Guards the worker-shutdown fix."""
-    import time
 
     measure = "pytest-measure"
     target = "pytest-worker-leak"

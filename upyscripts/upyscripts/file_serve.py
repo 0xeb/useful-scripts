@@ -4,7 +4,6 @@ Simple file sharing server — browse, download, and upload files over LAN.
 """
 
 import argparse
-import os
 import socket
 import secrets
 from pathlib import Path
@@ -368,13 +367,12 @@ def main():
     )
 
     # Print access info
-    url = f"http://{args.host}:{args.port}"
     print(f"Serving {'file' if single_file else 'directory'}: {target}")
     print(f"Local:   http://localhost:{args.port}")
     for ip in get_local_ips():
         print(f"Network: http://{ip}:{args.port}")
     if args.password:
-        print(f"Password protection: enabled")
+        print("Password protection: enabled")
     if args.no_upload or single_file:
         print("Uploads: disabled")
     print()

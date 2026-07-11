@@ -15,10 +15,8 @@ Features:
 import argparse
 import html
 import io
-import mimetypes
 import os
 import posixpath
-import sys
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import unquote
 

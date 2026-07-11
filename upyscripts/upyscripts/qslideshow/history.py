@@ -5,7 +5,7 @@ Provides undo/redo functionality for actions.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, List, Optional, Any, Dict
+from typing import TYPE_CHECKING, List, Any, Dict
 from collections import deque
 from .actions import UndoableAction, Action
 

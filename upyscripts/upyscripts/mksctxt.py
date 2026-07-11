@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Tuple, List
 
 from PIL import Image, ImageDraw, ImageFont
-from pygments import highlight
 from pygments.lexers import get_lexer_by_name, guess_lexer
 from pygments.token import Token
 
@@ -184,7 +183,7 @@ def render_code_block(
     """
     try:
         lexer = get_lexer_by_name(lang)
-    except:
+    except Exception:
         lexer = guess_lexer(code)
 
     tokens = list(lexer.get_tokens(code))
@@ -298,7 +297,6 @@ def render_markdown_to_image(
     window_x = 0
     window_y = 0
     window_w = width * s
-    window_h = content_height
 
     # Draw titlebar and dots (only if window frame enabled)
     if window:

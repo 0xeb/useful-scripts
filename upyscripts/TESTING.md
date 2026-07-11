@@ -4,14 +4,12 @@ Comprehensive test coverage for qslideshow web mode functionality.
 
 ## Test Statistics
 
-**Total Tests:** 152
-**Status:** ✅ All Passing
-**Execution Time:** ~30 seconds
-**Coverage:** ~75-80% of core functionality
+The canonical counts are reported by `pytest`; they are intentionally not pinned
+here because the suite grows with each regression fix.
 
 ## Test Breakdown
 
-### Backend Python Tests (145 tests)
+### Backend Python Tests
 
 #### 1. Action System Tests (40 tests)
 **File:** `tests/test_qslideshow_actions.py`
@@ -60,7 +58,7 @@ Comprehensive test coverage for qslideshow web mode functionality.
 - **Gesture Manager** (5 tests): Initialization, mapping, execution
 - **Threshold Config** (2 tests): Custom thresholds
 
-### Frontend Playwright Tests (7 tests)
+### Frontend Playwright Tests (8 tests)
 
 #### 5. Basic UI Tests (2 tests)
 **File:** `tests/test_qslideshow_playwright_basic.py`
@@ -101,7 +99,6 @@ Comprehensive test coverage for qslideshow web mode functionality.
 ### ⚠️ Deferred for Future
 
 - History/Undo system (complex file I/O, lower priority)
-- Trash management (complex file I/O, lower priority)
 - PWA features (service worker, offline mode)
 - Integration scenarios (can be tested manually)
 - Edge cases (empty lists, permissions, etc.)
@@ -110,7 +107,7 @@ Comprehensive test coverage for qslideshow web mode functionality.
 
 ### Run All Tests
 ```bash
-pytest tests/test_qslideshow*.py -v
+pytest
 ```
 
 ### Run Specific Test File
@@ -123,17 +120,18 @@ pytest tests/test_qslideshow_gestures.py -v
 
 ### Run Playwright Tests Only
 ```bash
-pytest tests/test_qslideshow_playwright*.py -v
+pytest tests/test_qslideshow_playwright*.py -v --browser chromium
 ```
 
 ### Run Backend Tests Only (skip Playwright)
 ```bash
-pytest tests/test_qslideshow*.py -v --ignore=tests/test_qslideshow_playwright*
+pytest -v --ignore=tests/test_qslideshow_playwright_basic.py --ignore=tests/test_qslideshow_playwright_timer.py
 ```
 
 ## Test Requirements
 
 ### Python Dependencies
+- Python 3.10 or newer
 - pytest >= 7.0
 - requests (for API tests)
 - Pillow (for test image generation)
@@ -144,6 +142,10 @@ pytest tests/test_qslideshow*.py -v --ignore=tests/test_qslideshow_playwright*
 pip install playwright pytest-playwright
 playwright install chromium
 ```
+
+The live Windows debugger tests require a reachable Windows rrepl server. Set
+`RREPL_URL` or create `.claude/rrepl.json` with a `url` key; without that
+external environment, those tests are reported as conditional skips.
 
 ### Install All Dev Dependencies
 ```bash
@@ -169,7 +171,7 @@ playwright install chromium
 
 ## Future Improvements
 
-- Add history/trash tests with proper API understanding
+- Add more history tests with proper API understanding
 - Add PWA feature tests (wake lock, offline, install)
 - Add integration tests (complete user workflows)
 - Add edge case tests (permissions, empty lists, etc.)

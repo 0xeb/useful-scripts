@@ -140,7 +140,7 @@ def create_side_by_side(
             missing.append(str(img_path))
 
     if missing:
-        print(f"  Error: Missing image(s):")
+        print("  Error: Missing image(s):")
         for m in missing:
             print(f"    - {m}")
         return False
@@ -199,7 +199,7 @@ def create_side_by_side(
                 if img not in images:
                     img.close()
             combined.close()
-        except:
+        except Exception:
             pass  # Ignore cleanup errors
 
         return True
@@ -366,7 +366,7 @@ List file format:
                 args.format,
                 args.quality
             ):
-                print(f"  ✓ Created successfully")
+                print("  ✓ Created successfully")
                 success_count += 1
 
         print()

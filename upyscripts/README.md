@@ -4,6 +4,8 @@ A collection of useful Python scripts for various development and file manipulat
 
 ## Installation
 
+Python 3.10 or newer is required.
+
 ```bash
 pip install -e .
 ```

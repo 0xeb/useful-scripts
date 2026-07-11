@@ -284,11 +284,11 @@ def process_extraction(input_path, output_base_dir=None, recursive=False):
                 total_images += image_count
                 processed_pdfs += 1
             else:
-                print(f"  ⚠ No images found in this PDF\n")
+                print("  ⚠ No images found in this PDF\n")
                 # Remove empty folder
                 try:
                     output_dir.rmdir()
-                except:
+                except OSError:
                     pass
                     
         except Exception as e:
@@ -296,7 +296,7 @@ def process_extraction(input_path, output_base_dir=None, recursive=False):
     
     # Summary
     print("=" * 50)
-    print(f"Extraction complete!")
+    print("Extraction complete!")
     print(f"  • Processed PDFs: {processed_pdfs}/{len(pdf_files)}")
     print(f"  • Total unique images extracted: {total_images}")
     print(f"  • Output location: {output_base}")
@@ -401,21 +401,6 @@ COMPILATION Examples:
     
     if not args.mode:
         parser.print_help()
-        sys.exit(1)
-    
-    # Check if required libraries are installed
-    try:
-        import fitz
-    except ImportError:
-        print("\nError: PyMuPDF is not installed.")
-        print("Please install it using: pip3 install PyMuPDF")
-        sys.exit(1)
-    
-    try:
-        from PIL import Image
-    except ImportError:
-        print("\nError: Pillow is not installed.")
-        print("Please install it using: pip3 install Pillow")
         sys.exit(1)
     
     if args.mode == 'extract':

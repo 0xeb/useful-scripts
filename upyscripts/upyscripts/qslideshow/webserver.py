@@ -25,7 +25,7 @@ except ImportError:
 from .core import SlideshowContext
 from .config import ConfigManager
 from .actions import action_registry, ExternalToolManager, FilterScriptRunner, PostScriptRunner
-from .hotkeys import HotkeyManager, WebHotkeyAdapter
+from .hotkeys import HotkeyManager
 from .gestures import GestureManager
 from .history import ActionHistory, UndoAction, RedoAction
 from .trash import TrashManager
@@ -338,7 +338,6 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         session_id, session = self._require_session()
         if session is None:
             # For image serving, we can work without a session
-            session_id = None
             session = None
         
         try:
@@ -390,7 +389,6 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         session_id, session = self._require_session()
         if session is None:
             # For thumbnail serving, we can work without a session
-            session_id = None
             session = None
 
         try:
@@ -931,7 +929,7 @@ class WebSlideshow:
         server_address = ('', self.port)
         httpd = http.server.HTTPServer(server_address, self.handler)
 
-        print(f"Web slideshow server running on:")
+        print("Web slideshow server running on:")
         print(f"  http://localhost:{self.port}")
         print(f"  http://0.0.0.0:{self.port}")
         print(f"\nServing {len(self.image_paths)} images")

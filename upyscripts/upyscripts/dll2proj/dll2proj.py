@@ -89,7 +89,7 @@ def generate_mock_project(dll_path, output_dir):
     # Create a DEF file for the DLL
     def_filename, dllfile = create_def_file(dll_path)
     if not dllfile:
-        print(err := def_filename)
+        print(def_filename)
         return
 
     # Define the expansion dictionary

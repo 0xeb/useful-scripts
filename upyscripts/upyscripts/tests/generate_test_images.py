@@ -5,7 +5,6 @@ Creates a variety of patterned images for testing gallery and slideshow modes.
 """
 
 from PIL import Image, ImageDraw, ImageFont
-import random
 import math
 from pathlib import Path
 
@@ -19,7 +18,7 @@ def create_solid_color(size, color, number):
     contrast_color = (255 - color[0], 255 - color[1], 255 - color[2])
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 120)
-    except:
+    except OSError:
         font = ImageFont.load_default()
 
     text = str(number)
@@ -51,7 +50,7 @@ def create_gradient(size, start_color, end_color, number):
     draw = ImageDraw.Draw(img)
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 120)
-    except:
+    except OSError:
         font = ImageFont.load_default()
 
     text = str(number)
@@ -91,7 +90,7 @@ def create_checkerboard(size, color1, color2, squares, number):
     draw = ImageDraw.Draw(img)
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 120)
-    except:
+    except OSError:
         font = ImageFont.load_default()
 
     text = str(number)
@@ -133,7 +132,7 @@ def create_stripes(size, color1, color2, stripe_count, vertical, number):
     # Add label
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 120)
-    except:
+    except OSError:
         font = ImageFont.load_default()
 
     text = str(number)
@@ -171,7 +170,7 @@ def create_circles(size, bg_color, circle_color, count, number):
     # Add label
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 120)
-    except:
+    except OSError:
         font = ImageFont.load_default()
 
     text = str(number)
@@ -247,7 +246,7 @@ def generate_test_images(output_dir, count=30, size=(800, 800)):
         print(f"  Created: {filename}")
 
     print(f"\nSuccessfully generated {count} test images!")
-    print(f"You can now test qslideshow with:")
+    print("You can now test qslideshow with:")
     print(f"  upy.qslideshow {output_path} --web --web-gallery")
 
 

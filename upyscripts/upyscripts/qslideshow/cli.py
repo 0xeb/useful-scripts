@@ -6,7 +6,6 @@ Handles argument parsing and orchestrates between GUI and web server modes.
 
 import argparse
 import sys
-from pathlib import Path
 
 from .core import (
     TEMPLATE_VARIABLES,

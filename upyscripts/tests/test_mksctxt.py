@@ -4,8 +4,7 @@ Tests for mksctxt - Markdown to image converter.
 
 import os
 import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from PIL import Image
@@ -267,7 +266,7 @@ class TestRenderMarkdownToImage:
             output_path = f.name
 
         try:
-            result = render_markdown_to_image(md, output_path)
+            render_markdown_to_image(md, output_path)
             assert os.path.exists(output_path)
 
             with Image.open(output_path) as img:
@@ -347,7 +346,7 @@ def hello():
             output_path = f.name
 
         try:
-            result = render_markdown_to_image(md, output_path)
+            render_markdown_to_image(md, output_path)
             assert os.path.exists(output_path)
 
             with Image.open(output_path) as img:
@@ -364,7 +363,7 @@ def hello():
             output_path = f.name
 
         try:
-            result = render_markdown_to_image(md, output_path)
+            render_markdown_to_image(md, output_path)
             assert os.path.exists(output_path)
         finally:
             if os.path.exists(output_path):
@@ -377,7 +376,6 @@ class TestCLI:
     def test_main_missing_input(self):
         """Test that missing input file causes error."""
         import sys
-        from io import StringIO
         from upyscripts.mksctxt import main
 
         with patch.object(sys, 'argv', ['mksctxt']):
