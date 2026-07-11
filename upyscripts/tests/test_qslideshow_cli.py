@@ -35,6 +35,19 @@ def test_explicit_cli_options_override_config():
     assert config.get('web.dev_mode') is True
 
 
+def test_repeat_mode_is_authoritative_and_repeat_is_legacy_alias():
+    explicit = parse_arguments(['images', '--repeat', '--repeat-mode', 'shuffle-each'])
+    legacy = parse_arguments(['images', '--repeat'])
+    explicit_config = ConfigManager()
+    legacy_config = ConfigManager()
+
+    explicit_config.update_from_args(explicit)
+    legacy_config.update_from_args(legacy)
+
+    assert explicit_config.get('slideshow.repeat_mode') == 'shuffle-each'
+    assert legacy_config.get('slideshow.repeat_mode') == 'fixed'
+
+
 def test_custom_extensions_apply_to_directory_file_and_response_file(tmp_path):
     nested = tmp_path / 'nested'
     nested.mkdir()

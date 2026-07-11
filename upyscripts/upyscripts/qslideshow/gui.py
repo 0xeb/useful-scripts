@@ -76,6 +76,7 @@ class ImageSlideshow:
         # Get values from config with CLI overrides
         speed = speed if speed is not None else self.config.get('slideshow.speed', 3.0)
         repeat = repeat if repeat is not None else self.config.get('slideshow.repeat', False)
+        repeat_mode = self.config.get('slideshow.repeat_mode')
         fit_mode = fit_mode if fit_mode is not None else self.config.get('slideshow.fit_mode', 'shrink')
         status_format = status_format or self.config.get('slideshow.status_format')
         always_on_top = always_on_top if always_on_top is not None else self.config.get('slideshow.always_on_top', False)
@@ -88,6 +89,7 @@ class ImageSlideshow:
             image_paths=image_paths,
             speed=speed,
             repeat=repeat,
+            repeat_mode=repeat_mode,
             fit_mode=fit_mode,
             status_format=status_format,
             always_on_top=always_on_top,
@@ -114,6 +116,9 @@ class ImageSlideshow:
             if image_paths:
                 base_path = image_paths[0].parent
                 self.trash_manager = TrashManager(base_path, trash_dir)
+                cleanup_days = self.config.get('file_operations.auto_cleanup_days')
+                if cleanup_days is not None and cleanup_days > 0:
+                    self.trash_manager.cleanup_old_items(cleanup_days)
             else:
                 self.trash_manager = None
         else:
@@ -247,7 +252,7 @@ class ImageSlideshow:
                     print("Slideshow resumed")
             
             elif action_name == 'toggle_repeat':
-                print(f"Repeat mode: {'on' if self.context.repeat else 'off'}")
+                print(f"Repeat mode: {self.context.repeat_mode.value}")
             
             elif action_name == 'toggle_shuffle':
                 print(f"Shuffle mode: {'on' if self.context.shuffle else 'off'}")

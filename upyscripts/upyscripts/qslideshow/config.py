@@ -23,8 +23,7 @@ class ConfigManager:
 # General slideshow settings
 slideshow:
   speed: 3.0  # seconds between slides
-  repeat: false  # loop back to first image after last
-  repeat_mode: "fixed"  # Repeat modes: fixed | shuffle | shuffle-each
+  repeat_mode: "none"  # Repeat modes: none | fixed | shuffle | shuffle-each
   # - fixed: repeat with same order
   # - shuffle: shuffle once at start, repeat that order
   # - shuffle-each: reshuffle on each repeat cycle
@@ -272,6 +271,11 @@ gestures:
             print(f"Warning: Failed to load config from {path}: {e}")
             return
         
+        # Migrate the legacy boolean when no explicit repeat mode is present.
+        slideshow_config = user_config.get('slideshow', {}) if isinstance(user_config, dict) else {}
+        if 'repeat' in slideshow_config and 'repeat_mode' not in slideshow_config:
+            slideshow_config['repeat_mode'] = 'fixed' if slideshow_config['repeat'] else 'none'
+
         # Deep merge user config with defaults
         self.config = self._deep_merge(self.config, user_config)
     
@@ -287,6 +291,8 @@ gestures:
     
     def get(self, key_path: str, default: Any = None) -> Any:
         """Get config value by dot-notation path (e.g., 'slideshow.speed')."""
+        if key_path == 'slideshow.repeat':
+            return self.get('slideshow.repeat_mode', 'none') != 'none'
         keys = key_path.split('.')
         value = self.config
         for key in keys:
@@ -298,6 +304,9 @@ gestures:
     
     def set(self, key_path: str, value: Any) -> None:
         """Set config value by dot-notation path."""
+        if key_path == 'slideshow.repeat':
+            key_path = 'slideshow.repeat_mode'
+            value = 'fixed' if value else 'none'
         keys = key_path.split('.')
         target = self.config
         for key in keys[:-1]:
@@ -308,10 +317,11 @@ gestures:
     
     def update_from_args(self, args: Any) -> None:
         """Update configuration from command-line arguments."""
+        arg_values = vars(args)
         # Map CLI arguments to config paths
         arg_mapping = {
             'speed': 'slideshow.speed',
-            'repeat': 'slideshow.repeat',
+            'repeat_mode': 'slideshow.repeat_mode',
             'fit_mode': 'slideshow.fit_mode',
             'status': 'slideshow.status_format',
             'always_on_top': 'slideshow.always_on_top',
@@ -326,14 +336,19 @@ gestures:
         }
 
         for arg_name, config_path in arg_mapping.items():
-            if hasattr(args, arg_name):
-                value = getattr(args, arg_name)
+            if arg_name in arg_values:
+                value = arg_values[arg_name]
                 if value is not None:
                     self.set(config_path, value)
 
+        # Backward-compatible --repeat alias. An explicit --repeat-mode wins.
+        if (arg_values.get('repeat_mode') is None
+                and arg_values.get('repeat') is True):
+            self.set('slideshow.repeat_mode', 'fixed')
+
         # Handle gallery-specific arguments
-        if hasattr(args, 'web_gallery'):
-            web_gallery = getattr(args, 'web_gallery')
+        if 'web_gallery' in arg_values:
+            web_gallery = arg_values['web_gallery']
             if web_gallery is not None:
                 # If --web-gallery is provided, enable gallery mode
                 self.set('gallery.enabled', True)
@@ -342,14 +357,14 @@ gestures:
                     self.set('gallery.grid', web_gallery)
 
         # Override grid if --web-gallery-grid is explicitly provided
-        if hasattr(args, 'web_gallery_grid'):
-            web_gallery_grid = getattr(args, 'web_gallery_grid')
+        if 'web_gallery_grid' in arg_values:
+            web_gallery_grid = arg_values['web_gallery_grid']
             if web_gallery_grid is not None:
                 self.set('gallery.grid', web_gallery_grid)
 
         # Handle thumbnail size
-        if hasattr(args, 'web_gallery_thumbnail_size'):
-            thumb_size = getattr(args, 'web_gallery_thumbnail_size')
+        if 'web_gallery_thumbnail_size' in arg_values:
+            thumb_size = arg_values['web_gallery_thumbnail_size']
             if thumb_size is not None:
                 self.set('gallery.thumbnail_size', thumb_size)
     

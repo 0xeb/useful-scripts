@@ -92,3 +92,22 @@ def test_playwright_can_navigate(web_server, page):
     # Check status updated
     new_status = status.inner_text()
     assert "2 / 3" in new_status
+
+
+def test_playwright_cycles_repeat_modes(web_server, page):
+    page.goto(web_server['url'])
+    status = page.locator('#status-overlay')
+    status.wait_for()
+
+    expected_modes = ['fixed', 'shuffle', 'shuffle-each']
+    for mode in expected_modes:
+        page.keyboard.press('r')
+        page.wait_for_function(
+            "mode => document.querySelector('#status-overlay').textContent.includes(mode)",
+            arg=mode,
+        )
+
+    page.keyboard.press('r')
+    page.wait_for_function(
+        "() => !document.querySelector('#status-overlay').textContent.includes('🔁')"
+    )

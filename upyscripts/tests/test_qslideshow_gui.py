@@ -117,3 +117,25 @@ def test_gui_uses_configured_geometry_and_background(tmp_path):
 
     fake_root.geometry.assert_called_once_with('1024x720')
     fake_tk.Canvas.assert_called_once_with(fake_root, bg='#123456')
+
+
+def test_gui_runs_configured_trash_cleanup_at_startup(tmp_path):
+    image_path = tmp_path / 'image.png'
+    image_path.write_bytes(b'image')
+    config = ConfigManager()
+    config.set('file_operations.auto_cleanup_days', 7)
+    config.set('external_tools.base_name', None)
+    fake_tk = Mock()
+    fake_tk.Tk.return_value = Mock()
+    fake_tk.Canvas.return_value = Mock()
+    trash_manager = Mock()
+
+    with (
+        patch('upyscripts.qslideshow.gui.tk', fake_tk),
+        patch('upyscripts.qslideshow.gui.TrashManager', return_value=trash_manager),
+        patch.object(ImageSlideshow, 'display_current_image'),
+        patch.object(ImageSlideshow, 'schedule_next'),
+    ):
+        ImageSlideshow([image_path], config=config)
+
+    trash_manager.cleanup_old_items.assert_called_once_with(7)

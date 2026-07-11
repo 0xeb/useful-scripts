@@ -9,6 +9,8 @@ import fnmatch
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 
+from .repeat_modes import RepeatMode
+
 
 # Default image file extensions
 DEFAULT_IMAGE_EXTENSIONS = {
@@ -70,6 +72,7 @@ class SlideshowContext:
     """Holds the complete state and context of the slideshow."""
 
     def __init__(self, image_paths: List[Path], speed: float = 3.0, repeat: bool = False,
+                 repeat_mode=None,
                  fit_mode: str = 'shrink', status_format: Optional[str] = None,
                  always_on_top: bool = False, shuffle: bool = False, paused: bool = False,
                  gallery_enabled: bool = False, gallery_grid: Optional[Tuple[int, int]] = None,
@@ -82,7 +85,11 @@ class SlideshowContext:
 
         # Slideshow settings
         self.speed_seconds = speed
-        self.repeat = repeat
+        self.repeat_mode = (
+            RepeatMode.from_config(repeat_mode)
+            if repeat_mode is not None
+            else (RepeatMode.FIXED if repeat else RepeatMode.NONE)
+        )
         self.fit_mode = fit_mode
         self.status_format = status_format
         self.always_on_top = always_on_top
@@ -104,8 +111,17 @@ class SlideshowContext:
         self.gallery_mode_active = gallery_enabled  # Runtime toggle state for gallery view
 
         # Apply shuffle if requested
-        if self.shuffle:
+        if self.shuffle or self.repeat_mode.should_shuffle_on_start():
             random.shuffle(self.image_paths)
+
+    @property
+    def repeat(self) -> bool:
+        """Compatibility boolean derived from the authoritative repeat mode."""
+        return self.repeat_mode != RepeatMode.NONE
+
+    @repeat.setter
+    def repeat(self, enabled: bool) -> None:
+        self.repeat_mode = RepeatMode.FIXED if enabled else RepeatMode.NONE
 
     @property
     def speed_ms(self) -> int:
@@ -163,7 +179,7 @@ class SlideshowContext:
         # Slideshow state
         variables['speed'] = f"{self.speed_seconds:.1f}s"
         variables['paused'] = "PAUSED" if self.is_paused else ""
-        variables['repeat'] = "REPEAT" if self.repeat else ""
+        variables['repeat'] = self.repeat_mode.value if self.repeat else ""
         variables['repeat_count'] = str(self.repeat_count)
         variables['always_on_top'] = "TOP" if self.always_on_top else ""
         variables['shuffle'] = "SHUFFLE" if self.shuffle else ""

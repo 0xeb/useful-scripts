@@ -20,6 +20,7 @@ from unittest.mock import Mock, patch, call
 from PIL import Image
 
 from upyscripts.qslideshow.core import SlideshowContext
+from upyscripts.qslideshow.repeat_modes import RepeatMode
 from upyscripts.qslideshow.actions import (
     action_registry,
     NavigateNextAction,
@@ -116,6 +117,20 @@ class TestNavigationActions:
         assert slideshow_context.current_index == 0
         assert slideshow_context.repeat_count == 1
 
+    def test_shuffle_each_reshuffles_at_every_forward_cycle(self, test_images):
+        context = SlideshowContext(test_images.copy(), repeat_mode='shuffle-each')
+        context.image_paths = test_images.copy()
+        context.current_index = len(test_images) - 1
+        action = NavigateNextAction()
+
+        with patch('upyscripts.qslideshow.actions.random.shuffle') as shuffle:
+            shuffle.side_effect = lambda order: order.reverse()
+            result = action.execute(context)
+
+        assert result['current_index'] == 0
+        assert context.image_paths == list(reversed(test_images))
+        assert context.repeat_count == 1
+
     def test_navigate_previous_basic(self, slideshow_context):
         """Test basic previous navigation."""
         action = NavigatePreviousAction()
@@ -190,6 +205,18 @@ class TestControlActions:
         result = action.execute(slideshow_context)
         assert result["repeat"] == True
         assert slideshow_context.repeat == True
+
+    def test_toggle_repeat_cycles_authoritative_modes(self, slideshow_context):
+        action = ToggleRepeatAction()
+
+        assert slideshow_context.repeat_mode == RepeatMode.NONE
+        assert action.execute(slideshow_context)['repeat_mode'] == 'fixed'
+        with patch('upyscripts.qslideshow.actions.random.shuffle'):
+            assert action.execute(slideshow_context)['repeat_mode'] == 'shuffle'
+            assert action.execute(slideshow_context)['repeat_mode'] == 'shuffle-each'
+        result = action.execute(slideshow_context)
+
+        assert result == {'repeat': False, 'repeat_mode': 'none'}
 
     def test_toggle_shuffle_gui_mode(self, slideshow_context):
         """Test shuffle in GUI mode manipulates image_paths."""

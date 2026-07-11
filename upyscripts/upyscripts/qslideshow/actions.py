@@ -14,7 +14,10 @@ import subprocess
 import platform
 import shutil
 import json
+import random
 from datetime import datetime
+
+from .repeat_modes import RepeatMode
 
 if TYPE_CHECKING:
     from .core import SlideshowContext
@@ -126,6 +129,11 @@ class NavigateNextAction(Action):
 
         if slideshow_context.current_index >= total_images:
             if slideshow_context.repeat:
+                if slideshow_context.repeat_mode.should_shuffle_on_cycle():
+                    order = (slideshow_context.image_order
+                             if hasattr(slideshow_context, 'image_order')
+                             else slideshow_context.image_paths)
+                    random.shuffle(order)
                 slideshow_context.current_index = 0
                 slideshow_context.repeat_count += 1
             else:
@@ -189,8 +197,23 @@ class ToggleRepeatAction(Action):
         super().__init__("toggle_repeat", "Toggle loop mode", ActionContext.BOTH)
     
     def execute(self, slideshow_context: SlideshowContext, **kwargs) -> Dict[str, Any]:
-        slideshow_context.repeat = not slideshow_context.repeat
-        return {"repeat": slideshow_context.repeat}
+        modes = list(RepeatMode)
+        current = modes.index(slideshow_context.repeat_mode)
+        slideshow_context.repeat_mode = modes[(current + 1) % len(modes)]
+
+        if slideshow_context.repeat_mode.should_shuffle_on_start():
+            order = (slideshow_context.image_order
+                     if hasattr(slideshow_context, 'image_order')
+                     else slideshow_context.image_paths)
+            current_item = order[slideshow_context.current_index] if order else None
+            random.shuffle(order)
+            if current_item is not None:
+                slideshow_context.current_index = order.index(current_item)
+
+        return {
+            "repeat": slideshow_context.repeat,
+            "repeat_mode": slideshow_context.repeat_mode.value,
+        }
 
 
 class ToggleShuffleAction(Action):

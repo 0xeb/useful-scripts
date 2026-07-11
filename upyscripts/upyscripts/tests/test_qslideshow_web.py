@@ -16,6 +16,7 @@ import requests
 import threading
 import socket
 from pathlib import Path
+from unittest.mock import Mock, patch
 from PIL import Image
 
 from upyscripts.qslideshow.webserver import WebSlideshow
@@ -101,6 +102,29 @@ class TestServerStartup:
         assert web_server_with_password.password == "test123"
         assert len(web_server_with_password.authenticated_sessions) == 0
 
+    def test_status_exposes_repeat_mode_and_compatibility_boolean(self, web_server):
+        response = requests.get(
+            f'http://localhost:{web_server.port}/api/status',
+            headers={'X-Session-ID': 'repeat-status'},
+        )
+
+        assert response.status_code == 200
+        assert response.json()['repeat_mode'] == 'none'
+        assert response.json()['repeat'] is False
+
+    def test_web_server_runs_configured_trash_cleanup_at_startup(self, test_images):
+        config = ConfigManager()
+        config.set('file_operations.auto_cleanup_days', 14)
+        trash_manager = Mock()
+
+        with patch(
+            'upyscripts.qslideshow.webserver.TrashManager',
+            return_value=trash_manager,
+        ):
+            WebSlideshow(test_images, config=config, port=find_free_port())
+
+        trash_manager.cleanup_old_items.assert_called_once_with(14)
+
     @pytest.mark.parametrize('path', ['/', '/slideshow.js', '/app.manifest'])
     def test_dev_mode_disables_browser_caching(self, web_server_dev, path):
         response = requests.get(f'http://localhost:{web_server_dev.port}{path}')
@@ -142,6 +166,30 @@ class TestSessionIndependence:
         )
         assert r.status_code == 200
         assert r.json()["current_index"] == 1
+
+    def test_repeat_mode_cycles_and_wraps_through_real_api(self, web_server):
+        base_url = f'http://localhost:{web_server.port}'
+        headers = {'X-Session-ID': 'repeat-cycle'}
+
+        toggled = requests.post(
+            f'{base_url}/api/execute',
+            json={'action': 'toggle_repeat'},
+            headers=headers,
+        )
+        assert toggled.json()['repeat_mode'] == 'fixed'
+
+        for _ in range(3):
+            response = requests.post(
+                f'{base_url}/api/execute',
+                json={'action': 'navigate_next'},
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+        status = requests.get(f'{base_url}/api/status', headers=headers).json()
+        assert status['current_index'] == 0
+        assert status['repeat_count'] == 1
+        assert status['repeat_mode'] == 'fixed'
 
     def test_sessions_can_navigate_independently(self, web_server):
         """Test that multiple sessions can navigate independently."""

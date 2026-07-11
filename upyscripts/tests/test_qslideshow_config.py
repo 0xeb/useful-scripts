@@ -213,6 +213,16 @@ hotkeys:
         # Should have defaults
         assert config.get('slideshow.speed') == 3.0
 
+    def test_legacy_repeat_boolean_migrates_when_mode_is_absent(self, temp_config_dir):
+        config_file = temp_config_dir / 'legacy.yaml'
+        config_file.write_text('slideshow:\n  repeat: true\n', encoding='utf-8')
+        config = ConfigManager()
+
+        config.load_config(str(config_file))
+
+        assert config.get('slideshow.repeat_mode') == 'fixed'
+        assert config.get('slideshow.repeat') is True
+
 
 class TestDeepMerge:
     """Test deep merge logic."""

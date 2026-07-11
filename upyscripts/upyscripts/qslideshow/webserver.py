@@ -504,6 +504,8 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
             'is_paused': session.is_paused,
             'speed': session.speed_seconds,
             'repeat': session.repeat,
+            'repeat_mode': session.repeat_mode.value,
+            'repeat_count': session.repeat_count,
             'shuffle': session.shuffle,
             'status_text': status_text,
             'gallery_mode_active': getattr(session, 'gallery_mode_active', False)
@@ -528,6 +530,7 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         config = {
             'speed': session.speed_seconds,
             'repeat': session.repeat,
+            'repeat_mode': session.repeat_mode.value,
             'shuffle': session.shuffle,
             'fit_mode': session.fit_mode,
             'always_on_top': session.always_on_top,
@@ -881,6 +884,9 @@ class WebSlideshow:
             trash_dir = self.config.get('file_operations.trash_dir', '.trash')
             base_path = self.image_paths[0].parent
             self.trash_manager = TrashManager(base_path, trash_dir)
+            cleanup_days = self.config.get('file_operations.auto_cleanup_days')
+            if cleanup_days is not None and cleanup_days > 0:
+                self.trash_manager.cleanup_old_items(cleanup_days)
         else:
             self.trash_manager = None
 
@@ -888,9 +894,9 @@ class WebSlideshow:
         """Create a new session for a client."""
         # Each session gets its own context
         session = SlideshowContext(
-            image_paths=self.image_paths,  # Share the same image list
+            image_paths=self.image_paths.copy(),
             speed=self.config.get('slideshow.speed', 3.0),
-            repeat=self.config.get('slideshow.repeat', False),
+            repeat_mode=self.config.get('slideshow.repeat_mode', 'none'),
             fit_mode=self.config.get('slideshow.fit_mode', 'shrink'),
             status_format=self.config.get('slideshow.status_format'),
             always_on_top=self.config.get('slideshow.always_on_top', False),
@@ -909,7 +915,8 @@ class WebSlideshow:
         # Per-session order (list of indices into self.image_paths)
         n = len(self.image_paths)
         session.image_order = list(range(n))
-        if self.config.get('slideshow.shuffle', False):
+        if (self.config.get('slideshow.shuffle', False)
+                or session.repeat_mode.should_shuffle_on_start()):
             # Each session gets a fresh shuffle using the global random state
             # The global random module maintains good entropy across calls
             random.shuffle(session.image_order)

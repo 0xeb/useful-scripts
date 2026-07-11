@@ -138,7 +138,14 @@ Template variables:
         '--repeat',
         action='store_true',
         default=None,
-        help='Loop back to first image after last'
+        help='Deprecated alias for --repeat-mode fixed'
+    )
+
+    parser.add_argument(
+        '--repeat-mode',
+        choices=['none', 'fixed', 'shuffle', 'shuffle-each'],
+        default=None,
+        help='End-of-list behavior (default from config: none)'
     )
 
     parser.add_argument(

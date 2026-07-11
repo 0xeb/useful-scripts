@@ -45,7 +45,7 @@ def web_server_with_timer(test_images):
     config = ConfigManager()
     # Set a short speed for testing (2 seconds)
     config.set('slideshow.speed', 2.0)
-    config.set('slideshow.repeat', True)  # Allow repeating
+    config.set('slideshow.repeat_mode', 'none')
 
     port = find_free_port()
     server = WebSlideshow(test_images, config=config, port=port)

@@ -32,9 +32,20 @@ class TrashManager:
                 self.manifest = {}
     
     def save_manifest(self):
-        """Save trash manifest to disk."""
-        with open(self.manifest_file, 'w') as f:
+        """Save trash manifest atomically."""
+        temporary = self.manifest_file.with_suffix('.json.tmp')
+        with open(temporary, 'w') as f:
             json.dump(self.manifest, f, indent=2, default=str)
+        temporary.replace(self.manifest_file)
+
+    def _trash_path(self, trash_name: str) -> Optional[Path]:
+        """Resolve a manifest name only when it remains inside the trash dir."""
+        try:
+            path = (self.trash_dir / trash_name).resolve()
+            path.relative_to(self.trash_dir.resolve())
+            return path
+        except (TypeError, ValueError, OSError):
+            return None
     
     def trash_file(self, file_path: Path) -> Path:
         """
@@ -120,13 +131,18 @@ class TrashManager:
         items_to_remove = []
         
         for trash_name, metadata in self.manifest.items():
-            deleted_at = datetime.strptime(metadata['deleted_at'], '%Y%m%d_%H%M%S')
+            try:
+                deleted_at = datetime.strptime(
+                    metadata['deleted_at'], '%Y%m%d_%H%M%S'
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
             if deleted_at < cutoff_date:
                 items_to_remove.append(trash_name)
         
         for trash_name in items_to_remove:
-            trash_path = self.trash_dir / trash_name
-            if trash_path.exists():
+            trash_path = self._trash_path(trash_name)
+            if trash_path is not None and trash_path.is_file():
                 trash_path.unlink()
             del self.manifest[trash_name]
         

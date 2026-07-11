@@ -7,6 +7,7 @@ class WebSlideshow {
         this.autoAdvanceTimer = null;
         this.speedSeconds = 3.0;
         this.repeat = false;
+        this.repeatMode = 'none';
         this.shuffle = false;
         this.wakeLock = null;
         this.wakeLockReacquireInterval = null;
@@ -104,6 +105,7 @@ class WebSlideshow {
             this.config = await response.json();
             this.speedSeconds = this.config.speed || 3.0;
             this.repeat = this.config.repeat || false;
+            this.repeatMode = this.config.repeat_mode || (this.repeat ? 'fixed' : 'none');
             this.shuffle = this.config.shuffle || false;
         } catch (error) {
             console.error('Failed to load config:', error);
@@ -320,6 +322,7 @@ class WebSlideshow {
         
         if ('repeat' in result) {
             this.repeat = result.repeat;
+            this.repeatMode = result.repeat_mode || (this.repeat ? 'fixed' : 'none');
             console.log('Repeat:', this.repeat ? 'on' : 'off');
             this.updateStatus();
             // Reset timer when repeat mode changes
@@ -617,7 +620,7 @@ class WebSlideshow {
         const current = this.currentIndex + 1;
         const total = this.images.length;
         const pauseStatus = this.isPaused ? ' (Paused)' : '';
-        const repeatStatus = this.repeat ? ' 🔁' : '';
+        const repeatStatus = this.repeat ? ` 🔁 ${this.repeatMode}` : '';
         const shuffleStatus = this.shuffle ? ' 🔀' : '';
         
         statusElement.textContent = `${current} / ${total}${pauseStatus}${repeatStatus}${shuffleStatus} | ${this.speedSeconds}s`;
@@ -656,6 +659,7 @@ class WebSlideshow {
                 
                 this.isPaused = status.is_paused || false;
                 this.repeat = status.repeat || false;
+                this.repeatMode = status.repeat_mode || (this.repeat ? 'fixed' : 'none');
                 this.shuffle = status.shuffle || false;
                 this.speedSeconds = status.speed || 3.0;
                 
