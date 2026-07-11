@@ -450,9 +450,11 @@ def main():
         text = f.read()
     
     # Create preprocessor instance
-    pp = preproc_t()
+    pp = preprocess_t()
     
-    # Set up defined variables
+    pp.parse(text.splitlines(keepends=True))
+
+    # Set up defined variables after parsing, because parse() resets state.
     for define in args.define:
         if '=' in define:
             var, val = define.split('=', 1)
@@ -460,8 +462,8 @@ def main():
         else:
             pp.set_var(define, '1')
     
-    # Process the text
-    result = pp.process(text)
+    # Process the parsed template.
+    result = pp.eval()
     
     # Output result
     if args.output:

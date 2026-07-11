@@ -99,3 +99,6 @@ include = ["upyscripts*"]
 # FileNotFoundError.
 "upyscripts.rrepl.plugins.dbg" = ["GUIDE.md"]
 "upyscripts.rrepl" = ["AGENT-GUIDE.md", "README.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "upyscripts/tests"]

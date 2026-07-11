@@ -1,33 +1,37 @@
-# test_mdparser.py
-from useful_libs.markdown.heading_parser import parse_markdown
+from upyscripts.lib.markdown.heading_parser import parse_markdown
 
-test_string = """
-# Meta
 
-## Socials
-
-This is a test social link
+def test_parse_markdown_builds_nested_heading_tree():
+    headings, parsed = parse_markdown(
+        """# Meta
 
 ## YouTube
 
 ### URL
 
-https://youtu.be/NQFn-hmmeLQ
+https://example.test/video
 
 ### Title
 
-Some title goes here
-
-### Description
-
-Some description goes here...
-
+Example title
 """
-def main():
-    headings, d = parse_markdown(test_string)
+    )
 
-    print(d['Meta']['YouTube']['Title'])
-    print(d['Meta']['YouTube']['URL'])
+    assert [heading.title for heading in headings] == ["Meta"]
+    assert parsed["Meta"]["YouTube"]["URL"]["contents"] == [
+        "",
+        "https://example.test/video",
+        "",
+    ]
+    assert parsed["Meta"]["YouTube"]["Title"]["contents"] == [
+        "",
+        "Example title",
+        "",
+    ]
 
-if __name__ == "__main__":
-    main()
+
+def test_markdown_dict_get_val_supports_nested_paths():
+    _, parsed = parse_markdown("# Root\n## Child\nvalue")
+
+    assert parsed.get_val("Root.Child") == "value"
+    assert parsed.get_val("Root.Missing", "fallback") == "fallback"
