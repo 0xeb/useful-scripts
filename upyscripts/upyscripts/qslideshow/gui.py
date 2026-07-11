@@ -146,7 +146,7 @@ class ImageSlideshow:
         # Initialize tkinter
         self.root = tk.Tk()
         self.root.title("Image Slideshow")
-        self.root.geometry("640x480")
+        self.root.geometry(self.config.get('gui.initial_size', '800x600'))
 
         # Set focus to receive keyboard events
         self.root.focus_set()
@@ -156,7 +156,10 @@ class ImageSlideshow:
             self.root.attributes('-topmost', True)
 
         # Create canvas for image display
-        self.canvas = tk.Canvas(self.root, bg='black')
+        self.canvas = tk.Canvas(
+            self.root,
+            bg=self.config.get('gui.background_color', '#000000'),
+        )
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
         # Create status text if format provided

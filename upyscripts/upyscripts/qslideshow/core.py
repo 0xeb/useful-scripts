@@ -221,7 +221,18 @@ class SlideshowContext:
         return self.format_template(self.status_format)
 
 
-def find_images(directory: Path, recursive: bool, exclude_patterns: List[str] = []) -> List[Path]:
+def normalize_image_extensions(additional_extensions=None):
+    """Return supported extensions normalized to lowercase with leading dots."""
+    extensions = set(DEFAULT_IMAGE_EXTENSIONS)
+    for extension in additional_extensions or []:
+        normalized = str(extension).strip().lower()
+        if normalized:
+            extensions.add(normalized if normalized.startswith('.') else f'.{normalized}')
+    return extensions
+
+
+def find_images(directory: Path, recursive: bool, exclude_patterns=None,
+                additional_extensions=None) -> List[Path]:
     """Find all image files in a directory, case-insensitively."""
     if not directory.is_dir():
         print(f"Error: Path is not a directory: {directory}")
@@ -229,8 +240,8 @@ def find_images(directory: Path, recursive: bool, exclude_patterns: List[str] = 
 
     image_files = []
 
-    # Create a case-insensitive set of extensions
-    extensions = {ext.lower() for ext in DEFAULT_IMAGE_EXTENSIONS}
+    exclude_patterns = exclude_patterns or []
+    extensions = normalize_image_extensions(additional_extensions)
 
     glob_pattern = '**/*' if recursive else '*'
 
@@ -243,7 +254,7 @@ def find_images(directory: Path, recursive: bool, exclude_patterns: List[str] = 
     return sorted(image_files)
 
 
-def parse_response_file(filepath: Path) -> List[Path]:
+def parse_response_file(filepath: Path, additional_extensions=None) -> List[Path]:
     """
     Parse a response file containing image paths.
 
@@ -258,6 +269,7 @@ def parse_response_file(filepath: Path) -> List[Path]:
         return []
 
     image_files = []
+    extensions = normalize_image_extensions(additional_extensions)
 
     try:
         with open(filepath, 'r') as f:
@@ -266,7 +278,7 @@ def parse_response_file(filepath: Path) -> List[Path]:
                 if line and not line.startswith('#'):
                     path = Path(line)
                     if path.exists() and path.is_file():
-                        if path.suffix.lower() in DEFAULT_IMAGE_EXTENSIONS:
+                        if path.suffix.lower() in extensions:
                             image_files.append(path)
     except Exception as e:
         print(f"Error reading response file: {e}")
@@ -275,7 +287,8 @@ def parse_response_file(filepath: Path) -> List[Path]:
 
 
 def collect_images_from_paths(path_args: List[str], recursive: bool = False, 
-                             exclude_patterns: List[str] = None) -> List[Path]:
+                             exclude_patterns: List[str] = None,
+                             additional_extensions=None) -> List[Path]:
     """
     Collect image files from multiple paths, handling directories, files, and response files.
     
@@ -296,17 +309,19 @@ def collect_images_from_paths(path_args: List[str], recursive: bool = False,
         if path_arg.startswith('@'):
             # Response file
             response_file = Path(path_arg[1:])
-            image_files.extend(parse_response_file(response_file))
+            image_files.extend(parse_response_file(response_file, additional_extensions))
         else:
             # Directory or file
             path = Path(path_arg)
             if path.is_dir():
                 # Search directory for images
-                images = find_images(path, recursive, exclude_patterns)
+                images = find_images(
+                    path, recursive, exclude_patterns, additional_extensions
+                )
                 image_files.extend(images)
             elif path.is_file():
                 # Single file directly specified
-                if path.suffix.lower() in {ext.lower() for ext in DEFAULT_IMAGE_EXTENSIONS}:
+                if path.suffix.lower() in normalize_image_extensions(additional_extensions):
                     # Check against exclude patterns
                     if not any(fnmatch.fnmatch(path.name, p) for p in exclude_patterns):
                         image_files.append(path)

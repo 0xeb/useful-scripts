@@ -384,7 +384,7 @@ class TestUpdateFromArgs:
         args = Mock()
         args.port = 9000
         args.host = '127.0.0.1'
-        args.dev_mode = True
+        args.web_dev = True
 
         config.update_from_args(args)
 

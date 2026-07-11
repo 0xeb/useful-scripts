@@ -207,7 +207,7 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'text/html')
         
         # Add cache-busting headers in development mode
-        if self.web_slideshow.config.get('web_dev', False):
+        if self.web_slideshow.config.get('web.dev_mode', False):
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_header('Pragma', 'no-cache')
             self.send_header('Expires', '0')
@@ -230,7 +230,7 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'text/html')
 
         # Add cache-busting headers in development mode
-        if self.web_slideshow.config.get('web_dev', False):
+        if self.web_slideshow.config.get('web.dev_mode', False):
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_header('Pragma', 'no-cache')
             self.send_header('Expires', '0')
@@ -254,7 +254,7 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'application/javascript')
         
         # Add cache-busting headers in development mode
-        if self.web_slideshow.config.get('web_dev', False):
+        if self.web_slideshow.config.get('web.dev_mode', False):
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_header('Pragma', 'no-cache')
             self.send_header('Expires', '0')
@@ -286,7 +286,7 @@ class WebSlideshowHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'application/manifest+json')
         
         # Add cache-busting headers in development mode
-        if self.web_slideshow.config.get('web_dev', False):
+        if self.web_slideshow.config.get('web.dev_mode', False):
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_header('Pragma', 'no-cache')
             self.send_header('Expires', '0')

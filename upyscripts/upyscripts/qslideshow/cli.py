@@ -115,6 +115,7 @@ Template variables:
     parser.add_argument(
         '-r', '--recursive',
         action='store_true',
+        default=None,
         help='Search subdirectories for images'
     )
 
@@ -128,7 +129,7 @@ Template variables:
     parser.add_argument(
         '-s', '--speed',
         type=float,
-        default=3.0,
+        default=None,
         metavar='SECONDS',
         help='Seconds between slides (default: 3.0)'
     )
@@ -136,13 +137,14 @@ Template variables:
     parser.add_argument(
         '--repeat',
         action='store_true',
+        default=None,
         help='Loop back to first image after last'
     )
 
     parser.add_argument(
         '-f', '--fit-mode',
         choices=['shrink', 'original'],
-        default='shrink',
+        default=None,
         help='Image display mode: shrink (default) or original'
     )
 
@@ -155,18 +157,21 @@ Template variables:
     parser.add_argument(
         '--always-on-top',
         action='store_true',
+        default=None,
         help='Keep window above all other windows'
     )
 
     parser.add_argument(
         '--shuffle',
         action='store_true',
+        default=None,
         help='Randomize image order'
     )
 
     parser.add_argument(
         '--paused',
         action='store_true',
+        default=None,
         help='Start slideshow in paused mode'
     )
 
@@ -180,7 +185,7 @@ Template variables:
     parser.add_argument(
         '--port',
         type=int,
-        default=8000,
+        default=None,
         help='Port for web server mode (default: 8000)'
     )
 
@@ -194,6 +199,7 @@ Template variables:
     parser.add_argument(
         '--web-dev',
         action='store_true',
+        default=None,
         help='Development mode: disable browser caching for live editing of web files'
     )
 
@@ -220,7 +226,7 @@ Template variables:
         '--web-gallery-thumbnail-size',
         type=parse_size,
         metavar='WIDTHxHEIGHT',
-        default=(200, 200),
+        default=None,
         help='Thumbnail size for gallery mode in pixels (default: 200x200, e.g., "150x150")'
     )
 
@@ -295,19 +301,18 @@ def main():
         print("Error: No image paths provided. Use --help for usage information.")
         sys.exit(1)
 
-    # Parse exclude patterns
     exclude_patterns = []
-    if args.exclude:
-        for pattern_arg in args.exclude:
-            # Split by semicolon if multiple patterns in one argument
-            patterns = pattern_arg.split(';')
-            exclude_patterns.extend(p.strip() for p in patterns if p.strip())
+    for pattern_arg in config_manager.get('images.exclude_patterns', []) or []:
+        exclude_patterns.extend(
+            pattern.strip() for pattern in pattern_arg.split(';') if pattern.strip()
+        )
 
     # Collect image files from all specified paths
     image_files = collect_images_from_paths(
         args.paths, 
-        recursive=args.recursive,
-        exclude_patterns=exclude_patterns
+        recursive=config_manager.get('images.recursive', False),
+        exclude_patterns=exclude_patterns,
+        additional_extensions=config_manager.get('images.extensions', []),
     )
 
     if not image_files:
@@ -317,9 +322,10 @@ def main():
     print(f"Found {len(image_files)} images")
 
     # Expand status preset if needed
-    status_format = None
-    if args.status:
-        status_format = get_status_template(args.status)
+    status_format = config_manager.get('slideshow.status_format')
+    if status_format:
+        status_format = get_status_template(status_format)
+        config_manager.set('slideshow.status_format', status_format)
 
     # Apply filter/post script CLI overrides to config
     if hasattr(args, 'filter_script') and args.filter_script:
@@ -340,11 +346,11 @@ def main():
         web_slideshow = WebSlideshow(
             image_files,
             config=config_manager,
-            port=args.port,
+            port=config_manager.get('web.port', 8000),
             password=args.web_password if hasattr(args, 'web_password') else None
         )
         
-        if args.web_dev:
+        if config_manager.get('web.dev_mode', False):
             print("🔧 Development mode enabled - browser caching disabled")
 
         try:
@@ -367,14 +373,7 @@ def main():
         slideshow = ImageSlideshow(
             image_files,
             config=config_manager,
-            speed=args.speed if hasattr(args, 'speed') else None,
-            repeat=args.repeat if hasattr(args, 'repeat') else None,
-            fit_mode=args.fit_mode if hasattr(args, 'fit_mode') else None,
             status_format=status_format,
-            always_on_top=args.always_on_top if hasattr(args, 'always_on_top') else None,
-            shuffle=args.shuffle if hasattr(args, 'shuffle') else None,
-            external_tools=args.external_tools if hasattr(args, 'external_tools') else None,
-            paused=args.paused if hasattr(args, 'paused') else None
         )
 
         try:

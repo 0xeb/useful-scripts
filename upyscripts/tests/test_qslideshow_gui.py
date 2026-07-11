@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 from upyscripts.qslideshow.core import SlideshowContext
 from upyscripts.qslideshow.gui import ImageSlideshow
+from upyscripts.qslideshow.config import ConfigManager
 
 
 def make_slideshow(paths, *, repeat=False, current_index=0):
@@ -90,3 +91,29 @@ def test_all_invalid_images_quit_once():
 
     assert slideshow.context.image_paths == []
     slideshow.quit.assert_called_once_with()
+
+
+def test_gui_uses_configured_geometry_and_background(tmp_path):
+    image_path = tmp_path / 'image.png'
+    image_path.write_bytes(b'not loaded in this test')
+    config = ConfigManager()
+    config.set('gui.initial_size', '1024x720')
+    config.set('gui.background_color', '#123456')
+    config.set('file_operations.enable_trash', False)
+    config.set('external_tools.base_name', None)
+    fake_root = Mock()
+    fake_canvas = Mock()
+    fake_tk = Mock()
+    fake_tk.Tk.return_value = fake_root
+    fake_tk.Canvas.return_value = fake_canvas
+    fake_tk.BOTH = 'both'
+
+    with (
+        patch('upyscripts.qslideshow.gui.tk', fake_tk),
+        patch.object(ImageSlideshow, 'display_current_image'),
+        patch.object(ImageSlideshow, 'schedule_next'),
+    ):
+        ImageSlideshow([image_path], config=config)
+
+    fake_root.geometry.assert_called_once_with('1024x720')
+    fake_tk.Canvas.assert_called_once_with(fake_root, bg='#123456')

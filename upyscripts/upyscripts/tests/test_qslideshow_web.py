@@ -73,6 +73,19 @@ def web_server_with_password(test_images):
     yield server
 
 
+@pytest.fixture
+def web_server_dev(test_images):
+    """Start web server with browser caching disabled."""
+    config = ConfigManager()
+    config.set('web.dev_mode', True)
+    port = find_free_port()
+    server = WebSlideshow(test_images, config=config, port=port)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    time.sleep(0.5)
+    yield server
+
+
 class TestServerStartup:
     """Test server initialization and startup."""
 
@@ -87,6 +100,15 @@ class TestServerStartup:
         assert web_server_with_password.port > 0
         assert web_server_with_password.password == "test123"
         assert len(web_server_with_password.authenticated_sessions) == 0
+
+    @pytest.mark.parametrize('path', ['/', '/slideshow.js', '/app.manifest'])
+    def test_dev_mode_disables_browser_caching(self, web_server_dev, path):
+        response = requests.get(f'http://localhost:{web_server_dev.port}{path}')
+
+        assert response.status_code == 200
+        assert response.headers['Cache-Control'] == 'no-cache, no-store, must-revalidate'
+        assert response.headers['Pragma'] == 'no-cache'
+        assert response.headers['Expires'] == '0'
 
 
 class TestSessionIndependence:

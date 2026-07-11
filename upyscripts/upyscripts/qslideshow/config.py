@@ -322,7 +322,7 @@ gestures:
             'port': 'web.port',
             'host': 'web.host',
             'external_tools': 'external_tools.base_name',
-            'dev_mode': 'web.dev_mode'
+            'web_dev': 'web.dev_mode'
         }
 
         for arg_name, config_path in arg_mapping.items():
