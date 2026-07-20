@@ -17,6 +17,15 @@ pip uninstall upyscripts
 
 ## Scripts
 
+### help_command.py
+Discovers and lists all installed `upy.*` commands with their descriptions.
+
+```bash
+upy.help                # List all available commands
+upy.help pdf3img        # Show help for a specific command
+upy.help --verbose      # Include module paths
+```
+
 ### asm_emit.py
 Converts binary files into Visual C++ compatible `__asm __emit` statements for x86 assembly embedding.
 
@@ -43,20 +52,28 @@ file.bin
 ```
 
 ### dll2proj.py
-Generates a Visual Studio project from a DLL file by extracting all exports and creating corresponding function stubs with dummy implementations.
+Generates a mock C++/CMake project from a DLL file by extracting all exports and creating corresponding function stubs with dummy implementations. Useful for producing an import library when only the DLL is available. Windows-oriented (requires `pefile`; the generated project targets MSVC).
 
 ```bash
-upy.dll2proj library.dll --output MyProject
-upy.dll2proj system32.dll --project-name SystemStubs
+upy.dll2proj -d library.dll -p MyProject
 ```
 
-### eval_cpp.py
-Evaluates C/C++ expression snippets by compiling and executing them in a temporary environment.
+Both arguments are required: `-d/--dll` is the input DLL and `-p/--project` is the output directory. See [upyscripts/dll2proj/README.md](upyscripts/dll2proj/README.md) for details.
+
+### file_serve.py
+Simple file sharing server — browse, download, and upload files over LAN.
 
 ```bash
-upy.eval_cpp "sizeof(int)"
-upy.eval_cpp "std::numeric_limits<double>::max()" --std c++11
-echo "2 + 2 * 3" | upy.eval_cpp
+upy.file_serve                       # Serve the current directory
+upy.file_serve ~/shared --port 8019
+upy.file_serve --password secret --no-upload
+```
+
+### file_upload.py
+Minimal web page for receiving file uploads with a progress bar.
+
+```bash
+upy.file_upload --port 5001 --upload-dir ./uploads
 ```
 
 ### html_entities.py
@@ -65,6 +82,18 @@ Escapes HTML entities in source files for safe HTML embedding.
 ```bash
 upy.html_entities input.html > escaped.html
 upy.html_entities raw_content.txt --output safe_content.txt
+```
+
+### imgsxs.py
+Image side-by-side generator — combines multiple images into single side-by-side composites, driven by a list file.
+
+```bash
+upy.imgsxs --input-dir photos/ -l pairs.txt -o ./sxs-output
+upy.imgsxs --input-dir shots/ -l list.txt -f png --separator-width 0
+
+# List file format (one composite per line, comma-separated):
+# before.jpg, after.jpg
+# a.png, b.png, c.png
 ```
 
 ### jsonutils.py
@@ -306,26 +335,22 @@ upy.dlcalc --list-locations  # List all built-in cities
 ```
 
 ### src_to_llm_context.py
-Converts codebases into structured Markdown documents optimized for LLM context:
+Converts codebases into structured Markdown documents optimized for LLM context (installed as `upy.src2llm`):
 
 ```bash
 # Single file
-upy.src_to_llm_context main.py > context.md
+upy.src2llm main.py > context.md
 
 # Directory with filters
-upy.src_to_llm_context src/ --include "*.py,*.js" --output codebase.md
+upy.src2llm src/ --include "*.py,*.js" --output codebase.md
 
 # Recursive with size limit
-upy.src_to_llm_context . -r --max-size 100000 --skip-binary > project_context.md
+upy.src2llm . -r --max-size 100000 --skip-binary > project_context.md
 
 # Multiple paths
-upy.src_to_llm_context src/ tests/ docs/*.md --output full_context.md
+upy.src2llm src/ tests/ docs/*.md --output full_context.md
 ```
 
 ## License
 
-[Add license information here]
-
-## Contributing
-
-[Add contribution guidelines here]
+MIT License - see [LICENSE](../LICENSE) file for details.

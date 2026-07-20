@@ -18,9 +18,12 @@ This installs the following command-line tools with `upy.` prefix:
 - `upy.applydiff` - Apply binary patch DIF files
 - `upy.asm_emit` - Convert binary to Visual C++ __asm __emit statements
 - `upy.dll2proj` - Convert DLL to Visual Studio project with function stubs (requires pefile)
+- `upy.file_serve` - File sharing server (browse, download, upload over LAN)
 - `upy.file_upload` - File upload utility
 - `upy.ghview` - GitHub-style local repository browser with syntax highlighting
+- `upy.help` - List all available upy commands and their descriptions
 - `upy.html_entities` - Escape HTML entities
+- `upy.imgsxs` - Combine multiple images into side-by-side composites
 - `upy.jsonutils` - JSON utility tool (beautify, minify, validate, tree view, query)
 - `upy.markdown_render` - Render Markdown to HTML on localhost
 - `upy.mdcomdec` - Decompose/recompose Markdown files
@@ -30,6 +33,7 @@ This installs the following command-line tools with `upy.` prefix:
 - `upy.preprocess` - Preprocessing utility
 - `upy.pyast` - Analyze Python AST (functions, classes, imports)
 - `upy.qslideshow` - Cross-platform image slideshow viewer with web server
+- `upy.rrepl` - HTTP JSON Python REPL server with persistent sessions (`upy.rrepl-dbg` adds a debugger plugin)
 - `upy.src2llm` - Convert codebase to LLM-friendly Markdown
 - `upy.dlcalc` - Calculate and visualize daylight hours and sunset times
 
@@ -67,7 +71,6 @@ For building and using the Triton DBA framework:
 - `/c/` - C language projects (Windows/MSVC specific)
   - `codecave/` - Static code cave demonstration
   - `shellcode_loader/` - Shellcode loading example
-- `/batch/` - Windows batch scripts (jsonbeauty.bat)
 - `/tritonenv/` - Triton DBA framework environment setup (Windows)
 
 ## Common Commands
@@ -88,8 +91,8 @@ cd upyscripts
 python -m pytest tests/
 
 # Run specific test file
-python -m pytest tests/test_mdparser.py
-python -m pytest tests/test_find_latest.py
+python -m pytest tests/test_preprocess.py
+python -m pytest tests/test_mksctxt.py
 ```
 
 ### Development
@@ -119,4 +122,4 @@ The `upyscripts` package uses setuptools with `pyproject.toml` configuration. Al
 - The eval_cpp tool generates and compiles C++ code dynamically using CMake
 - The qslideshow web interface is a Progressive Web App with offline support
 - The ghview tool provides a GitHub-like web interface for browsing local repositories with full syntax highlighting
-- All Python tools are Python 3.7+ compatible
+- All Python tools require Python 3.10+ (see `requires-python` in upyscripts/pyproject.toml)

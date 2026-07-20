@@ -84,9 +84,9 @@ rrepl-dbg = [
 dbg = "upyscripts.rrepl.plugins.dbg"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/upyscripts"
-Repository = "https://github.com/yourusername/upyscripts"
-Issues = "https://github.com/yourusername/upyscripts/issues"
+Homepage = "https://github.com/0xeb/useful-scripts"
+Repository = "https://github.com/0xeb/useful-scripts"
+Issues = "https://github.com/0xeb/useful-scripts/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -98,6 +98,8 @@ include = ["upyscripts*"]
 # FileNotFoundError.
 "upyscripts.rrepl.plugins.dbg" = ["GUIDE.md"]
 "upyscripts.rrepl" = ["AGENT-GUIDE.md", "README.md"]
+# dll2proj expands these templates at runtime relative to __file__.
+"upyscripts.dll2proj" = ["*.templ.*", "prep-cmake.bat"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "upyscripts/tests"]

@@ -19,17 +19,22 @@ This installs command-line tools with the `upy.` prefix:
 - `upy.applydiff` - Apply binary patch DIF files
 - `upy.asm_emit` - Convert binary to Visual C++ __asm __emit statements  
 - `upy.dll2proj` - Convert DLL to Visual Studio project with function stubs
+- `upy.file_serve` - File sharing server (browse, download, upload over LAN)
 - `upy.file_upload` - File upload utility
 - `upy.ghview` - GitHub-style local repository browser with syntax highlighting
+- `upy.help` - List all available upy commands and their descriptions
 - `upy.html_entities` - Escape HTML entities
+- `upy.imgsxs` - Combine multiple images into side-by-side composites
 - `upy.jsonutils` - JSON utility tool (beautify, minify, validate, tree view, query)
 - `upy.markdown_render` - Render Markdown to HTML on localhost
 - `upy.mdcomdec` - Decompose/recompose Markdown files
+- `upy.mksctxt` - Convert Markdown to styled PNG images with syntax highlighting
 - `upy.parse_vcf` - Parse VCF contact files
 - `upy.pdf3img` - Convert PDF pages to images
 - `upy.preprocess` - Preprocessing utility
 - `upy.pyast` - Analyze Python AST
 - `upy.qslideshow` - Cross-platform image slideshow viewer with web server
+- `upy.rrepl` - HTTP JSON Python REPL server with persistent sessions (`upy.rrepl-dbg` adds a debugger plugin)
 - `upy.src2llm` - Convert codebase to LLM-friendly Markdown
 - `upy.dlcalc` - Calculate and visualize daylight hours and sunset times for any location
 
@@ -38,7 +43,6 @@ This installs command-line tools with the `upy.` prefix:
 - **[upyscripts/](upyscripts/)** - Main Python package with installable CLI tools
 - **[python/](python/)** - Legacy standalone Python tools (eval_cpp)
 - **[c/](c/)** - C language projects (Windows/MSVC specific)
-- **[batch/](batch/)** - Windows batch scripts
 - **[tritonenv/](tritonenv/)** - Triton DBA framework environment setup (Windows)
 
 ## Documentation

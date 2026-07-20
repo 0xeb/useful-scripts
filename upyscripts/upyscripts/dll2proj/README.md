@@ -8,7 +8,7 @@ dll2proj converts a DLL file into a Visual Studio project (via a CMake generator
 `dll2proj` takes two arguments: the path to the DLL file and the output directory for the mock project. It parses all the exported symbols, then create a complete Visual Studio project with a header file containing the function stubs and a source file with the dummy implementation.
 
 ```
-usage: dll2proj.py [-h] -d DLL_FILE -p PROJECT
+usage: upy.dll2proj [-h] -d DLL -p PROJECT
 
 Generates a mock C++ DLL project based on DLL exports.
 
